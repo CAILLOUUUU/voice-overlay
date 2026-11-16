@@ -6,8 +6,8 @@ Quand tu n'es dans aucun vocal, il n'affiche rien.
 
 ## Installation (une seule fois)
 
-1. Mets **Voice Overlay.exe** dans un dossier à toi (il y enregistre ses réglages).
-2. Ouvre Discord **desktop** (pas la version navigateur), puis lance **Voice Overlay.exe**.
+1. Mets **Voice Overlay - CAILLOU X CLAUDE.exe** dans un dossier à toi (il y enregistre ses réglages).
+2. Ouvre Discord **desktop** (pas la version navigateur), puis lance **Voice Overlay - CAILLOU X CLAUDE.exe**.
    - Windows peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**. C'est normal pour une appli non signée.
 3. La page de réglages s'ouvre. Suis les 4 étapes pour relier l'overlay à Discord (création d'une appli Discord gratuite, environ 2 minutes).
 4. Une fenêtre s'ouvre dans Discord : clique sur **Autoriser**.
@@ -34,7 +34,7 @@ Des options dans l'URL passent au-dessus des réglages :
 
 ## À savoir
 - Ne montre jamais `config.json` ni `token.json` en stream et ne les partage pas : ils contiennent tes clés privées.
-- Pour donner l'appli à quelqu'un, envoie-lui **seulement** `Voice Overlay.exe`. Il créera sa propre appli Discord depuis la page de réglages.
+- Pour donner l'appli à quelqu'un, envoie-lui **seulement** `Voice Overlay - CAILLOU X CLAUDE.exe`. Il créera sa propre appli Discord depuis la page de réglages.
 - En cas de souci, le fichier `voice-overlay.log` (à côté du .exe) dit ce qui s'est passé.
 - Sans le .exe, on peut aussi lancer `start.bat` (il faut alors Node.js).
 

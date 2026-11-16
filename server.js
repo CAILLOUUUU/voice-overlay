@@ -5,7 +5,7 @@
 //   node server.js          -> mode normal (Discord desktop doit être ouvert)
 //   node server.js --open   -> pareil + ouvre la page de réglages
 //   node server.js --demo   -> faux membres (sans Discord)
-// Ce même fichier est aussi embarqué tel quel dans "Voice Overlay.exe".
+// Ce même fichier est aussi embarqué tel quel dans "Voice Overlay - CAILLOU X CLAUDE.exe".
 
 const net = require('net');
 const http = require('http');

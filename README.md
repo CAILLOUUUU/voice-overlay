@@ -3,7 +3,7 @@
 Overlay OBS qui affiche qui est dans ton salon vocal Discord, et qui suit tout seul le vocal où tu te trouves.
 
 - Guide d'utilisation : [LISEZMOI.md](LISEZMOI.md)
-- Téléchargement : `Voice Overlay.exe` dans les Releases
+- Téléchargement : `Voice Overlay - CAILLOU X CLAUDE.exe` dans les Releases
 
 ## Développement
 
@@ -20,7 +20,7 @@ node server.js --demo     # faux membres, sans Discord
 | `overlay.html` | La page affichée dans OBS |
 | `settings.html` | La page de réglages |
 | `webfonts/` | Polices fournies (licence OFL) |
-| `build/` | Fabrication de `Voice Overlay.exe` |
+| `build/` | Fabrication de `Voice Overlay - CAILLOU X CLAUDE.exe` |
 
 ## Fabriquer le .exe
 
@@ -30,7 +30,7 @@ npm install
 node build.js
 ```
 
-Le résultat arrive dans `dist/Voice Overlay.exe`.
+Le résultat arrive dans `dist/Voice Overlay - CAILLOU X CLAUDE.exe`.
 
 ## Ne jamais publier
 
