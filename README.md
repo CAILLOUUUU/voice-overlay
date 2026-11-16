@@ -1,59 +1,63 @@
 # VOICE OVERLAY - CAILLOU FEAT CLAUDE
 
-🇫🇷 **Version française : [LISEZMOI.md](LISEZMOI.md)**
+🇬🇧 **English version: [README.en.md](README.en.md)**
 
-An OBS overlay that shows who is in **your** Discord voice channel, and follows you automatically when you switch channels. No channel to pick by hand, nothing to install on the server.
+Overlay OBS qui affiche les personnes présentes dans **ton** salon vocal Discord, et qui te suit tout seul quand tu changes de salon. Aucun salon à choisir à la main, rien à installer sur le serveur.
 
-![Settings page with live preview](docs/settings.png)
+![Page de réglages avec aperçu en direct](docs/settings.png)
 
-- Shows who is speaking, muted or deafened, with Discord avatar decorations
-- Follows whatever voice channel you are in, and shows nothing when you are in none
-- Rename, reorder or hide people on the fly (forgotten when they leave)
-- Live settings page: layout, colors, 12 included fonts (or import your own), custom CSS
-- Export your style to a file and share it
-- English and French
+- Montre qui parle, qui est mute ou sourd, avec les décorations d'avatar Discord
+- Suit le vocal où tu te trouves, et n'affiche rien quand tu n'es dans aucun
+- Renommer, réordonner ou masquer des personnes à la volée (oublié quand elles partent)
+- Page de réglages en direct : disposition, couleurs, 12 polices fournies (ou importe la tienne), CSS personnalisé
+- Exporte ton style dans un fichier pour le partager
+- En français et en anglais
 
-> **Good to know:** this app relies on a Discord feature (local RPC) that Discord still labels as a private beta. If Discord changes or closes it, the overlay will stop working. Each user also needs to create their own free Discord "application" (the app walks you through it, about 2 minutes).
+> **À savoir :** l'appli dépend d'une fonction de Discord (RPC local) encore classée en bêta privée. Si Discord la modifie ou la ferme, l'overlay cessera de fonctionner. Chaque utilisateur doit aussi créer sa propre « application » Discord gratuite (l'appli te guide, environ 2 minutes).
 
-## Install (Windows)
+## Installation (Windows)
 
-1. Download `Voice Overlay - CAILLOU FEAT CLAUDE.exe` from the Releases page and put it in a folder of your own (it saves its settings next to itself).
-2. Open the Discord **desktop** app, then run the `.exe`.
-   - Windows may show "Windows protected your PC": click **More info**, then **Run anyway**. This is expected for an unsigned app.
-3. A setup assistant opens in your browser and guides you through 4 steps to link the overlay to Discord.
-4. At the end, Discord opens a window: click **Authorize**.
+1. Télécharge `Voice Overlay - CAILLOU FEAT CLAUDE.exe` depuis la page Releases et mets-le dans un dossier à toi (il enregistre ses réglages à côté de lui).
+2. Ouvre Discord **desktop** (pas la version navigateur), puis lance le `.exe`.
+   - Windows peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**. C'est normal pour une appli non signée.
+3. Un assistant s'ouvre dans ton navigateur et te guide en 4 étapes pour relier l'overlay à Discord.
+4. À la fin, Discord ouvre une fenêtre : clique sur **Autoriser**.
 
-The app then runs in the background with an icon next to the clock: left-click for settings, right-click to quit.
+L'appli tourne ensuite en arrière-plan. Son icône est à côté de l'horloge : clic gauche pour les réglages, clic droit pour quitter.
 
-## In OBS
+## Dans OBS
 
-Add a **Browser** source with the URL `http://localhost:47474/` (width 400, height 600 to start). The background is transparent.
+Ajoute une **Source → Navigateur** avec l'URL `http://localhost:47474/` (largeur 400, hauteur 600 pour commencer). Le fond est transparent.
 
-To use two sources with different looks, URL options override the settings:
+Pour avoir deux sources avec des styles différents, des options dans l'URL passent au-dessus des réglages :
 `?title` `?noTitle` `?hideSelf` `?speakingOnly` `?noName` `?size=48` `?align=right` `?layout=row`
 
-## Privacy
+## Vie privée
 
-- Everything runs on your PC. Your Discord codes are stored next to the `.exe` in `config.json` and `token.json`: never share these files or show them on stream.
-- The only outside requests are to Discord (login, avatars) and to GitHub, to check whether a newer version exists.
+- Tout tourne sur ton PC. Tes codes Discord sont enregistrés à côté du `.exe` dans `config.json` et `token.json` : ne partage jamais ces fichiers et ne les montre pas en stream.
+- Les seules connexions extérieures vont vers Discord (connexion, avatars) et vers GitHub, pour vérifier s'il existe une version plus récente.
 
-## Development
+## En cas de souci
 
-No dependencies to run, only Node.js 20 or later:
+Le fichier `voice-overlay.log`, à côté du `.exe`, dit ce qui s'est passé.
+
+## Développement
+
+Rien à installer pour le lancer, il faut seulement Node.js 20 ou plus :
 
 ```
-node server.js --open     # normal mode (Discord desktop open)
-node server.js --demo     # fake members, no Discord needed
+node server.js --open     # mode normal (Discord desktop ouvert)
+node server.js --demo     # faux membres, sans Discord
 ```
 
-| File | Role |
+| Fichier | Rôle |
 |---|---|
-| `server.js` | Discord connection (local RPC), local server, settings |
-| `overlay.html` | The page shown in OBS |
-| `settings.html` | The settings page and setup assistant |
-| `webfonts/` | Included fonts (OFL license) |
-| `build/` | Builds the `.exe` (`cd build && npm install && node build.js`) |
+| `server.js` | Connexion à Discord (RPC local), serveur local, réglages |
+| `overlay.html` | La page affichée dans OBS |
+| `settings.html` | La page de réglages et l'assistant |
+| `webfonts/` | Polices fournies (licence OFL) |
+| `build/` | Fabrication du `.exe` (`cd build && npm install && node build.js`) |
 
-## Credits
+## Crédits
 
-Made by Caillou, built with Claude. Released under the [MIT License](LICENSE). Bundles Node.js and open fonts: see [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
+Fait par Caillou, construit avec Claude. Publié sous [licence MIT](LICENSE). Embarque Node.js et des polices libres : voir [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
