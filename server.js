@@ -16,6 +16,10 @@ const crypto = require('crypto');
 const { exec, execFile, spawn } = require('child_process');
 
 const APP_NAME = 'VOICE OVERLAY - CAILLOU FEAT CLAUDE';
+const VERSION = '1.0.0';
+const REPO = 'CAILLOUUUU/voice-overlay';
+// Texte en deux langues : l'interface choisit, le journal utilise le français.
+const M = (fr, en) => ({ fr, en });
 const WIN = process.platform === 'win32';
 const DEMO = process.argv.includes('--demo');
 
@@ -108,7 +112,7 @@ function fontsCss() {
 }
 
 // ---------- Config (identifiants Discord) ----------
-const config = { port: 3000, redirectUri: 'http://localhost', clientId: '', clientSecret: '' };
+const config = { port: 47474, redirectUri: 'http://localhost', clientId: '', clientSecret: '' };
 Object.assign(config, readJson(CONFIG_PATH) || {});
 if (/^COLLE_/.test(config.clientId)) config.clientId = '';
 if (/^COLLE_/.test(config.clientSecret)) config.clientSecret = '';
@@ -117,6 +121,8 @@ const BASE_URL = `http://localhost:${config.port}`;
 
 // ---------- Réglages de l'overlay (modifiables depuis /settings) ----------
 const DEFAULTS = {
+  lang: 'auto',          // auto | fr | en
+  showDecorations: true,
   showTitle: true,
   titleText: '{salon}',
   layout: 'column',      // column | row
@@ -142,6 +148,14 @@ const DEFAULTS = {
 };
 const settings = { ...DEFAULTS };
 
+// Langue de l'interface : celle choisie, sinon celle du système.
+function uiLang() {
+  if (settings.lang === 'fr' || settings.lang === 'en') return settings.lang;
+  let loc = '';
+  try { loc = Intl.DateTimeFormat().resolvedOptions().locale || ''; } catch {}
+  return loc.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+}
+
 function applySettings(input) {
   if (!input || typeof input !== 'object') return;
   for (const k of Object.keys(DEFAULTS)) {
@@ -158,7 +172,7 @@ applySettings(readJson(SETTINGS_PATH));
 // ---------- État partagé ----------
 const state = {
   status: DEMO ? 'demo' : 'starting',  // setup | no-discord | auth | connected | error | demo
-  statusMsg: '',
+  statusMsg: null,
   user: null,
   channel: null,           // { id, name, guildId }
   selfId: null,
@@ -182,6 +196,8 @@ function snapshot() {
     status: state.status,
     statusMsg: state.statusMsg,
     user: state.user,
+    version: VERSION,
+    update,
     settings,
     assetsVersion,
     channel: state.channel,
@@ -205,13 +221,41 @@ function resetState() {
   state.speaking.clear();
 }
 
-function setStatus(status, msg = '') {
-  if (state.status === status && state.statusMsg === msg) return;
+function setStatus(status, msg = null) {
+  const same = JSON.stringify(state.statusMsg) === JSON.stringify(msg);
+  if (state.status === status && same) return;
   state.status = status;
   state.statusMsg = msg;
-  if (msg) console.log(msg);
+  if (msg) console.log(msg.fr);
   broadcast();
 }
+
+// ---------- Nouvelle version disponible ? (question posée à GitHub, rien d'autre n'est envoyé) ----------
+let update = null;
+function newer(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  }
+  return false;
+}
+async function checkUpdate() {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'voice-overlay', Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return;
+    const j = await r.json();
+    const latest = String(j.tag_name || '').replace(/^v/, '');
+    if (/^\d+(\.\d+){0,2}$/.test(latest) && newer(latest, VERSION) && String(j.html_url).startsWith(`https://github.com/${REPO}/`)) {
+      update = { version: latest, url: j.html_url };
+      broadcast();
+    }
+  } catch {}
+}
+setTimeout(checkUpdate, 4000);
+setInterval(checkUpdate, 6 * 3600 * 1000);
 
 // ---------- Lancement avec Windows ----------
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
@@ -244,9 +288,9 @@ $ni.Icon = New-Object System.Drawing.Icon($Icon)
 $ni.Text = 'Voice Overlay - Caillou feat Claude'
 $ni.Visible = $true
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$open = $menu.Items.Add('Ouvrir les réglages')
+$open = $menu.Items.Add('${uiLang() === 'fr' ? 'Ouvrir les réglages' : 'Open settings'}')
 $open.add_Click({ Start-Process $Url })
-$quit = $menu.Items.Add('Quitter')
+$quit = $menu.Items.Add('${uiLang() === 'fr' ? 'Quitter' : 'Quit'}')
 $quit.add_Click({
   try { Stop-Process -Id $ParentPid -Force } catch {}
   $ni.Visible = $false
@@ -333,7 +377,7 @@ async function handleApi(url, req, res) {
   const post = req.method === 'POST';
   if (url === '/api/state' && !post) {
     return sendJson(res, 200, {
-      app: APP_NAME, settings, defaults: DEFAULTS, clientId: config.clientId, hasConfig: hasConfig(), port: config.port,
+      app: APP_NAME, version: VERSION, settings, defaults: DEFAULTS, clientId: config.clientId, hasConfig: hasConfig(), port: config.port,
       canAutostart, autostart: canAutostart ? await getAutostart() : false, isExe: !!sea, dataDir: DIR,
     });
   }
@@ -349,11 +393,11 @@ async function handleApi(url, req, res) {
   if (url === '/api/upload') {
     const q = new URL(req.url, BASE_URL).searchParams;
     const kind = q.get('kind');
-    if (!USER_DIRS[kind]) return sendJson(res, 400, { error: 'Type inconnu.' });
+    if (!USER_DIRS[kind]) return sendJson(res, 400, { error: M('Type inconnu.', 'Unknown type.') });
     const name = safeName(kind, q.get('name'));
-    if (!name) return sendJson(res, 400, { error: `Format non accepté. Formats possibles : ${USER_EXT[kind].join(', ')}` });
+    if (!name) return sendJson(res, 400, { error: M(`Format non accepté. Formats possibles : ${USER_EXT[kind].join(', ')}`, `Unsupported format. Accepted: ${USER_EXT[kind].join(', ')}`) });
     const data = await readRaw(req, USER_MAX[kind]);
-    if (!data.length) return sendJson(res, 400, { error: 'Fichier vide.' });
+    if (!data.length) return sendJson(res, 400, { error: M('Fichier vide.', 'Empty file.') });
     fs.mkdirSync(USER_DIRS[kind], { recursive: true });
     fs.writeFileSync(path.join(USER_DIRS[kind], name), data);
     assetsVersion = Date.now();
@@ -373,8 +417,8 @@ async function handleApi(url, req, res) {
     case '/api/config': {
       const id = String(b.clientId || '').trim();
       const secret = String(b.clientSecret || '').trim() || (id === config.clientId ? config.clientSecret : '');
-      if (!/^\d{15,22}$/.test(id)) return sendJson(res, 400, { error: 'Le Client ID doit être une suite de chiffres.' });
-      if (secret.length < 10) return sendJson(res, 400, { error: 'Le Client Secret a l\'air incomplet.' });
+      if (!/^\d{15,22}$/.test(id)) return sendJson(res, 400, { error: M('Le Client ID doit être une suite de chiffres.', 'The Client ID must be digits only.') });
+      if (secret.length < 10) return sendJson(res, 400, { error: M('Le Client Secret a l\'air incomplet.', 'The Client Secret looks incomplete.') });
       config.clientId = id;
       config.clientSecret = secret;
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
@@ -387,7 +431,7 @@ async function handleApi(url, req, res) {
     // --- Réglages par personne (oubliés quand la personne quitte le vocal) ---
     case '/api/person': {
       const id = String(b.id || '');
-      if (!state.members.has(id)) return sendJson(res, 404, { error: 'Cette personne n\'est plus dans le vocal.' });
+      if (!state.members.has(id)) return sendJson(res, 404, { error: M('Cette personne n\'est plus dans le vocal.', 'This person is no longer in the voice channel.') });
       const c = { ...(state.custom.get(id) || {}) };
       if ('name' in b) c.name = String(b.name || '').trim().slice(0, 40);
       if ('hidden' in b) c.hidden = !!b.hidden;
@@ -407,7 +451,7 @@ async function handleApi(url, req, res) {
 
     case '/api/delete-file': {
       const name = USER_DIRS[b.kind] && safeName(b.kind, b.file);
-      if (!name) return sendJson(res, 400, { error: 'Fichier inconnu.' });
+      if (!name) return sendJson(res, 400, { error: M('Fichier inconnu.', 'Unknown file.') });
       try { fs.unlinkSync(path.join(USER_DIRS[b.kind], name)); } catch {}
       assetsVersion = Date.now();
       broadcast();
@@ -415,7 +459,7 @@ async function handleApi(url, req, res) {
     }
 
     case '/api/autostart':
-      if (!canAutostart) return sendJson(res, 400, { error: 'Disponible uniquement avec le .exe sous Windows.' });
+      if (!canAutostart) return sendJson(res, 400, { error: M('Disponible uniquement avec le .exe sous Windows.', 'Only available with the Windows .exe.') });
       await setAutostart(!!b.enabled);
       return sendJson(res, 200, { ok: true, autostart: await getAutostart() });
     case '/api/retry':
@@ -442,6 +486,7 @@ http.createServer((req, res) => {
   if (url === '/') return sendAsset(res, 'overlay.html', 'text/html; charset=utf-8');
   if (url === '/settings') return sendAsset(res, 'settings.html', 'text/html; charset=utf-8');
   if (url === '/icon.png' || url === '/favicon.ico') return sendAsset(res, 'icon.png', 'image/png');
+  if (url === '/licences') return sendAsset(res, 'LICENCES-TIERS.txt', 'text/plain; charset=utf-8');
 
   if (url === '/fonts.css') {
     res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'no-cache' });
@@ -498,10 +543,15 @@ function toMember(vs, guildId) {
   if (guildAvatar && guildId) avatar = `https://cdn.discordapp.com/guilds/${guildId}/users/${u.id}/avatars/${guildAvatar}.png?size=128`;
   else if (u.avatar) avatar = `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=128`;
   else avatar = `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(u.id) >> 22n) % 6n)}.png`;
+  const d = u.avatar_decoration_data;
+  const deco = d && /^\w+$/.test(d.asset || '')
+    ? `https://cdn.discordapp.com/avatar-decoration-presets/${d.asset}.png?size=160&passthrough=true`
+    : null;
   return {
     id: u.id,
     name: vs.nick || u.global_name || u.username,
     avatar,
+    deco,
     mute: !!(v.mute || v.self_mute),
     deaf: !!(v.deaf || v.self_deaf),
   };
@@ -589,9 +639,10 @@ class DiscordRPC {
   _onClose() {
     let err = new Error('Connexion Discord fermée');
     if (this.closeReason) {
-      err = new Error(/client.?id/i.test(this.closeReason)
-        ? 'Discord ne reconnaît pas ce Client ID. Vérifie que tu l\'as bien copié.'
-        : `Discord a refusé la connexion : ${this.closeReason}`);
+      err = new Error(this.closeReason);
+      err.msg = /client.?id/i.test(this.closeReason)
+        ? M('Discord ne reconnaît pas ce Client ID. Vérifie que tu l\'as bien copié.', 'Discord does not recognize this Client ID. Check that you copied it correctly.')
+        : M(`Discord a refusé la connexion : ${this.closeReason}`, `Discord refused the connection: ${this.closeReason}`);
       err.code = 'BLOCKED';
     }
     if (this._fail) { this._fail(err); this._fail = null; }
@@ -621,9 +672,11 @@ async function exchangeToken(params) {
   });
   const j = await r.json();
   if (!r.ok) {
-    const e = new Error(j.error === 'invalid_client'
-      ? 'Le Client Secret n\'est pas le bon. Refais « Reset Secret » sur le site Discord et colle le nouveau.'
-      : `Discord a refusé les codes (${j.error || r.status}). Vérifie le Client ID, le Client Secret et l'adresse http://localhost dans « Redirects ».`);
+    const e = new Error(`token: ${j.error || r.status}`);
+    e.msg = j.error === 'invalid_client'
+      ? M('Le Client Secret n\'est pas le bon. Refais « Reset Secret » sur le site Discord et colle le nouveau.', 'The Client Secret is wrong. Click "Reset Secret" on the Discord site again and paste the new one.')
+      : M(`Discord a refusé les codes (${j.error || r.status}). Vérifie le Client ID, le Client Secret et l'adresse http://localhost dans « Redirects ».`,
+          `Discord rejected the codes (${j.error || r.status}). Check the Client ID, the Client Secret and the http://localhost address under "Redirects".`);
     e.code = 'BLOCKED';
     throw e;
   }
@@ -642,12 +695,14 @@ async function authenticate(rpc) {
       } catch {}
     }
   }
-  setStatus('auth', 'Une fenêtre s\'est ouverte dans Discord : clique sur "Autoriser".');
+  setStatus('auth', M('Une fenêtre s\'est ouverte dans Discord : clique sur "Autoriser".', 'A window opened in Discord: click "Authorize".'));
   let code;
   try {
     ({ code } = await rpc.request('AUTHORIZE', { client_id: config.clientId, scopes: ['rpc', 'identify'] }));
   } catch (err) {
-    const e = new Error(`L'autorisation Discord a été refusée ou fermée. Clique sur « Réessayer », puis sur « Autoriser » dans Discord. (${err.message})`);
+    const e = new Error(err.message);
+    e.msg = M(`L'autorisation Discord a été refusée ou fermée. Clique sur « Réessayer », puis sur « Autoriser » dans Discord. (${err.message})`,
+              `The Discord authorization was declined or closed. Click "Try again", then "Authorize" in Discord. (${err.message})`);
     e.code = 'BLOCKED';
     throw e;
   }
@@ -743,7 +798,7 @@ async function run() {
     restartRequested = false;
     let blocked = false;
     if (!hasConfig()) {
-      setStatus('setup', 'Identifiants Discord manquants : ouvre la page de réglages pour les saisir.');
+      setStatus('setup', M('Identifiants Discord manquants : ouvre la page de réglages pour les saisir.', 'Discord credentials missing: open the settings page to enter them.'));
       await pause(3600000);
       continue;
     }
@@ -753,18 +808,18 @@ async function run() {
       const auth = await authenticate(rpc);
       state.selfId = auth.user.id;
       state.user = auth.user.global_name || auth.user.username;
-      setStatus('connected', `Connecté à Discord en tant que ${state.user}.`);
+      setStatus('connected', M(`Connecté à Discord en tant que ${state.user}.`, `Connected to Discord as ${state.user}.`));
       rpc.onEvent = onEvent;
       await rpc.request('SUBSCRIBE', {}, 'VOICE_CHANNEL_SELECT');
       const selected = await rpc.request('GET_SELECTED_VOICE_CHANNEL');
       queueFollow(selected ? selected.id : null);
       await rpc.closed;
-      if (!restartRequested) setStatus('no-discord', 'Connexion à Discord perdue, nouvelle tentative…');
+      if (!restartRequested) setStatus('no-discord', M('Connexion à Discord perdue, nouvelle tentative…', 'Lost connection to Discord, retrying…'));
     } catch (e) {
       if (rpc && rpc.sock) rpc.sock.destroy();
       if (!restartRequested) {
-        if (e.code === 'NO_DISCORD') setStatus('no-discord', 'Discord introuvable : l\'appli Discord (desktop) est bien ouverte ?');
-        else { blocked = e.code === 'BLOCKED'; setStatus('error', e.message); }
+        if (e.code === 'NO_DISCORD') setStatus('no-discord', M('Discord introuvable : l\'appli Discord (desktop) est bien ouverte ?', 'Discord not found: is the Discord desktop app open?'));
+        else { blocked = e.code === 'BLOCKED'; setStatus('error', e.msg || M(e.message, e.message)); }
       }
     }
     currentChannel = null;
@@ -781,7 +836,7 @@ function runDemo() {
   const names = ['CAILLOU', 'Zed main', 'Jungle Diff', 'mid or feed', 'Support Gap', 'ADC Enjoyer', 'Toplaner'];
   const add = (name, i) => {
     const id = String(100000000000000000n + BigInt(i) * 4194304n * 7n);
-    state.members.set(id, { id, name, avatar: `https://cdn.discordapp.com/embed/avatars/${i % 6}.png`, mute: false, deaf: false });
+    state.members.set(id, { id, name, avatar: `https://cdn.discordapp.com/embed/avatars/${i % 6}.png`, deco: null, mute: false, deaf: false });
     return id;
   };
   state.channel = { id: '1', name: 'Inhouse #12 — Équipe Bleue', guildId: '1' };

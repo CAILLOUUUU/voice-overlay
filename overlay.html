@@ -38,8 +38,12 @@
     box-sizing: border-box; object-fit: cover; background: #2b2d31;
     transition: border-color .12s, transform .12s, filter .2s, box-shadow .12s;
   }
+  .av { display: block; }
+  .avw { position: relative; flex: none; width: var(--size); height: var(--size); }
+  .deco { position: absolute; left: -10%; top: -10%; width: 120%; height: 120%; pointer-events: none; }
+  body.nodeco .deco { display: none; }
   .m.mute .av, .m.deaf .av { filter: grayscale(.7) brightness(.7); }
-  body.fx-bounce .m.speaking .av { animation: bounce .45s ease-in-out infinite alternate; }
+  body.fx-bounce .m.speaking .avw { animation: bounce .45s ease-in-out infinite alternate; }
 
   .name {
     color: var(--text); font-weight: var(--weight); white-space: nowrap;
@@ -109,7 +113,7 @@
 
 <template id="tpl">
   <div class="m">
-    <img class="av" alt="">
+    <span class="avw"><img class="av" alt=""><img class="deco" alt="" hidden></span>
     <span class="name"></span>
     <span class="tail">
       <span class="eq"><i></i><i></i><i></i></span>
@@ -165,6 +169,7 @@
     c.toggle('row', s.layout === 'row');
     c.toggle('noname', !s.showNames);
     c.toggle('noicons', !s.showIcons);
+    c.toggle('nodeco', !s.showDecorations);
     c.toggle('dim', s.dimSilent);
     c.toggle('anim', s.animate);
     for (const fx of ['ring', 'glow', 'bounce']) c.toggle('fx-' + fx, s.effect === fx);
@@ -180,7 +185,7 @@
   // Faux salon pour l'aperçu de la page de réglages
   const fake = {
     channel: { name: 'Inhouse #12' }, selfId: 'a',
-    members: ['Toi', 'Zed main', 'Jungle Diff', 'mid or feed', 'Support Gap'].map((name, i) => ({
+    members: ['CAILLOU', 'Zed main', 'Jungle Diff', 'mid or feed', 'Support Gap'].map((name, i) => ({
       id: 'abcde'[i], name, avatar: `https://cdn.discordapp.com/embed/avatars/${i}.png`,
       mute: i === 3, deaf: i === 4, speaking: i === 1,
     })),
@@ -192,9 +197,10 @@
   }, 900);
 
   const HINTS = {
-    setup: 'Overlay pas encore configuré : ouvre la page de réglages (/settings).',
-    auth: 'Clique sur « Autoriser » dans la fenêtre Discord.',
+    fr: { setup: 'Overlay pas encore configuré : ouvre la page de réglages (/settings).', auth: 'Clique sur « Autoriser » dans la fenêtre Discord.' },
+    en: { setup: 'Overlay not set up yet: open the settings page (/settings).', auth: 'Click "Authorize" in the Discord window.' },
   };
+  const langOf = s => (s.lang === 'fr' || s.lang === 'en') ? s.lang : ((navigator.language || '').toLowerCase().startsWith('fr') ? 'fr' : 'en');
 
   let assetsV = null;
   function render(snap) {
@@ -205,7 +211,8 @@
     applyStyle(s);
     const src = PREVIEW && !snap.channel ? fake : snap; // aperçu : vrai vocal si tu y es, sinon faux salon
 
-    const hint = PREVIEW ? '' : (snap.status === 'error' ? snap.statusMsg : HINTS[snap.status]) || '';
+    const lang = langOf(s);
+    const hint = PREVIEW ? '' : (snap.status === 'error' ? (snap.statusMsg || {})[lang] : HINTS[lang][snap.status]) || '';
     hintEl.hidden = !hint;
     hintEl.textContent = hint;
 
@@ -229,6 +236,9 @@
       }
       const img = el.querySelector('.av');
       if (img.getAttribute('src') !== m.avatar) img.src = m.avatar;
+      const deco = el.querySelector('.deco');
+      deco.hidden = !m.deco;
+      if (m.deco && deco.getAttribute('src') !== m.deco) deco.src = m.deco;
       el.querySelector('.name').textContent = m.name;
       el.classList.toggle('speaking', !!m.speaking);
       el.classList.toggle('mute', m.mute && !m.deaf);

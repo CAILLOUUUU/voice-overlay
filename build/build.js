@@ -23,7 +23,7 @@ if (!fs.existsSync(nodeExe)) {
 }
 
 // 2. Le programme + ses fichiers, regroupés en un seul bloc
-const assets = { 'overlay.html': 'overlay.html', 'settings.html': 'settings.html', 'icon.png': 'icon.png', 'icon.ico': 'icon.ico' };
+const assets = { 'LICENCES-TIERS.txt': 'LICENCES-TIERS.txt', 'overlay.html': 'overlay.html', 'settings.html': 'settings.html', 'icon.png': 'icon.png', 'icon.ico': 'icon.ico' };
 for (const f of fs.readdirSync(path.join(ROOT, 'webfonts'))) assets['webfonts/' + f] = 'webfonts/' + f;
 for (const k of Object.keys(assets)) assets[k] = path.join(ROOT, assets[k]);
 const blob = path.join(CACHE, 'sea.blob');
@@ -45,6 +45,9 @@ vi.setStringValues(lang, {
   CompanyName: 'Caillou', OriginalFilename: 'Voice Overlay - CAILLOU FEAT CLAUDE.exe', InternalName: 'VoiceOverlay',
   LegalCopyright: 'Caillou feat Claude (moteur : Node.js)',
 });
+vi.outputToResourceEntries(res.entries);
+vi.setFileVersion(1, 0, 0, 0, lang.lang);
+vi.setProductVersion(1, 0, 0, 0, lang.lang);
 vi.outputToResourceEntries(res.entries);
 res.outputResource(exe);
 exe.newHeader.optionalHeader.subsystem = 2;
