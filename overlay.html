@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Voice Overlay - Caillou feat Claude</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/fonts.css" id="fontcss">
+<style>
+  :root {
+    --size: 40px; --gap: 6px; --radius: 50%; --card-radius: 999px;
+    --speak: #3ba55d; --speak-glow: rgba(59, 165, 93, .55);
+    --accent: #8b6cff; --mute: #f23f43;
+    --text: #fff; --bg: rgba(18, 19, 24, .86);
+    --font: "Segoe UI"; --weight: 600;
+  }
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  body { font-family: var(--font), "Segoe UI", system-ui, sans-serif; }
+  #wrap { display: flex; flex-direction: column; align-items: flex-start; gap: var(--gap); padding: 12px; }
+  body.right #wrap { align-items: flex-end; }
+
+  #title { color: var(--text); background: var(--bg); margin-bottom: 4px; }
+  #title[hidden] { display: none; }
+
+  #list { display: flex; flex-direction: column; align-items: flex-start; gap: var(--gap); }
+  body.right #list { align-items: flex-end; }
+  body.row #list { flex-direction: row; flex-wrap: wrap; align-items: stretch; }
+  body.row.right #list { justify-content: flex-end; }
+
+  .m { position: relative; display: flex; align-items: center; gap: calc(var(--size) * .22);
+       transition: opacity .2s, border-color .15s, box-shadow .15s; }
+  body.anim .m { animation: pop .28s cubic-bezier(.2, .9, .3, 1.2); }
+  body.right .m { flex-direction: row-reverse; }
+  body.row .m { flex-direction: column; gap: 4px; }
+  body.dim .m:not(.speaking) { opacity: .45; }
+
+  .av {
+    width: var(--size); height: var(--size); border-radius: var(--radius); flex: none;
+    box-sizing: border-box; object-fit: cover; background: #2b2d31;
+    transition: border-color .12s, transform .12s, filter .2s, box-shadow .12s;
+  }
+  .m.mute .av, .m.deaf .av { filter: grayscale(.7) brightness(.7); }
+  body.fx-bounce .m.speaking .av { animation: bounce .45s ease-in-out infinite alternate; }
+
+  .name {
+    color: var(--text); font-weight: var(--weight); white-space: nowrap;
+    font-size: calc(var(--size) * .38);
+    max-width: calc(var(--size) * 5.5); overflow: hidden; text-overflow: ellipsis;
+  }
+  body.noname .name { display: none; }
+
+  .tail { display: flex; align-items: center; justify-content: center; }
+  .tail svg { width: calc(var(--size) * .42); height: calc(var(--size) * .42); fill: var(--mute); display: none; }
+  .m.mute .i-mute, .m.deaf .i-deaf { display: block; }
+  body.noicons .tail svg { display: none !important; }
+  .eq { display: none; align-items: center; gap: calc(var(--size) * .05); height: calc(var(--size) * .36); }
+  .eq i { width: calc(var(--size) * .075); height: 100%; border-radius: 99px; background: var(--speak);
+          transform-origin: center; animation: eq .5s ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: -.3s; animation-duration: .38s; }
+  .eq i:nth-child(3) { animation-delay: -.15s; animation-duration: .6s; }
+
+  /* ---------- Style des cartes ---------- */
+  body.t-card #title {
+    display: inline-flex; align-items: center; gap: .6em;
+    font-size: calc(var(--size) * .3); font-weight: 800; text-transform: uppercase; letter-spacing: .09em;
+    padding: .5em 1em .5em .85em; border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, .09); box-shadow: 0 3px 10px rgba(0, 0, 0, .3);
+  }
+  body.t-card #title::before {
+    content: ""; width: .6em; height: .6em; border-radius: 50%; flex: none;
+    background: var(--accent); box-shadow: 0 0 .7em var(--accent);
+  }
+  body.t-card .m {
+    background: var(--bg); border-radius: var(--card-radius);
+    padding: 4px calc(var(--size) * .3) 4px 4px;
+    border: 1px solid rgba(255, 255, 255, .09);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .3);
+  }
+  body.t-card.right .m { padding: 4px 4px 4px calc(var(--size) * .3); }
+  body.t-card.noname .m { padding: 4px; }
+  body.t-card .m.speaking { border-color: var(--speak); box-shadow: 0 0 0 1px var(--speak), 0 3px 10px rgba(0, 0, 0, .3); }
+  body.t-card.fx-glow .m.speaking { box-shadow: 0 0 0 1px var(--speak), 0 0 calc(var(--size) * .5) var(--speak-glow); }
+  body.t-card.fx-ring .m.speaking .av { box-shadow: 0 0 0 2px var(--speak); }
+  body.t-card .tail { width: calc(var(--size) * .42); }
+  body.t-card .m.speaking:not(.mute):not(.deaf) .eq { display: flex; }
+  body.t-card.noname .tail { display: none; }
+  body.t-card.row .m { border-radius: calc(var(--size) * .32); padding: 8px 10px 6px; min-width: calc(var(--size) * 1.3); }
+  body.t-card.row .tail { position: absolute; top: 3px; right: 3px; width: auto; }
+  body.t-card.row .eq { display: none !important; }
+  body.t-card.row .name { max-width: calc(var(--size) * 2.6); font-size: calc(var(--size) * .3); }
+
+  #hint {
+    font: 600 14px "Segoe UI", system-ui, sans-serif; color: #fff;
+    background: rgba(0, 0, 0, .75); padding: 8px 12px; border-radius: 6px; max-width: 340px;
+  }
+  #hint[hidden] { display: none; }
+
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-12%); } }
+  @keyframes eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+</style>
+<style id="custom"></style>
+</head>
+<body class="t-card">
+<div id="wrap">
+  <div id="hint" hidden></div>
+  <div id="title" hidden></div>
+  <div id="list"></div>
+</div>
+
+<template id="tpl">
+  <div class="m">
+    <img class="av" alt="">
+    <span class="name"></span>
+    <span class="tail">
+      <span class="eq"><i></i><i></i><i></i></span>
+      <svg class="i-mute" viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>
+      <svg class="i-deaf" viewBox="0 0 24 24"><path d="M12 4c3.87 0 7 3.13 7 7v2h-2.92L21 17.92V11c0-4.97-4.03-9-9-9-1.95 0-3.76.62-5.23 1.68l1.44 1.44C9.3 4.41 10.6 4 12 4zM2.27 1.72L1 3l3.33 3.32C3.49 7.68 3 9.29 3 11v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-1.17.29-2.26.79-3.22L15 17v4h3c.3 0 .59-.06.86-.14L21 23l1.27-1.27-20-20.01z"/></svg>
+    </span>
+  </div>
+</template>
+
+<script>
+  // Le style se règle sur http://localhost:3000/settings.
+  // Les options d'URL restent possibles et passent au-dessus des réglages
+  // (pratique pour avoir deux sources OBS différentes) :
+  //   ?title  ?noTitle  ?hideSelf  ?speakingOnly  ?noName  ?size=48  ?align=right  ?layout=row
+  const p = new URLSearchParams(location.search);
+  const PREVIEW = p.has('preview');
+
+  function withOverrides(s) {
+    s = { ...s };
+    if (p.has('title')) s.showTitle = true;
+    if (p.has('noTitle')) s.showTitle = false;
+    if (p.has('hideSelf')) s.hideSelf = true;
+    if (p.has('speakingOnly')) s.speakingOnly = true;
+    if (p.has('noName')) s.showNames = false;
+    if (Number(p.get('size'))) s.size = Number(p.get('size'));
+    if (p.get('align')) s.align = p.get('align');
+    if (p.get('layout')) s.layout = p.get('layout');
+    return s;
+  }
+
+  function rgba(hex, pct, fallback) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    const n = m ? parseInt(m[1], 16) : fallback;
+    return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${Math.max(0, Math.min(100, pct)) / 100})`;
+  }
+
+  const root = document.documentElement.style;
+  const customEl = document.getElementById('custom');
+  function applyStyle(s) {
+    root.setProperty('--size', s.size + 'px');
+    root.setProperty('--gap', s.gap + 'px');
+    root.setProperty('--radius', { circle: '50%', rounded: '24%', square: '0' }[s.shape] || '50%');
+    root.setProperty('--card-radius', { circle: '999px', rounded: `${Math.round(s.size * .3)}px`, square: '3px' }[s.shape] || '999px');
+    root.setProperty('--speak', s.speakColor);
+    root.setProperty('--speak-glow', rgba(s.speakColor, 55, 0x3ba55d));
+    root.setProperty('--accent', s.accentColor);
+    root.setProperty('--text', s.textColor);
+    root.setProperty('--bg', rgba(s.bgColor, s.bgOpacity, 0x121318));
+    root.setProperty('--font', JSON.stringify(s.font || 'Inter'));
+    root.setProperty('--weight', s.bold ? 700 : 500);
+    const c = document.body.classList;
+    c.toggle('right', s.align === 'right');
+    c.toggle('row', s.layout === 'row');
+    c.toggle('noname', !s.showNames);
+    c.toggle('noicons', !s.showIcons);
+    c.toggle('dim', s.dimSilent);
+    c.toggle('anim', s.animate);
+    for (const fx of ['ring', 'glow', 'bounce']) c.toggle('fx-' + fx, s.effect === fx);
+    if (customEl.textContent !== s.customCss) customEl.textContent = s.customCss;
+  }
+
+  const list = document.getElementById('list');
+  const titleEl = document.getElementById('title');
+  const hintEl = document.getElementById('hint');
+  const tpl = document.getElementById('tpl');
+  const els = new Map();
+
+  // Faux salon pour l'aperçu de la page de réglages
+  const fake = {
+    channel: { name: 'Inhouse #12' }, selfId: 'a',
+    members: ['Toi', 'Zed main', 'Jungle Diff', 'mid or feed', 'Support Gap'].map((name, i) => ({
+      id: 'abcde'[i], name, avatar: `https://cdn.discordapp.com/embed/avatars/${i}.png`,
+      mute: i === 3, deaf: i === 4, speaking: i === 1,
+    })),
+  };
+  let last = null;
+  if (PREVIEW) setInterval(() => {
+    fake.members.forEach((m, i) => { if (i < 3 && Math.random() < .4) m.speaking = !m.speaking; });
+    if (last) render(last);
+  }, 900);
+
+  const HINTS = {
+    setup: 'Overlay pas encore configuré : ouvre la page de réglages (/settings).',
+    auth: 'Clique sur « Autoriser » dans la fenêtre Discord.',
+  };
+
+  let assetsV = null;
+  function render(snap) {
+    last = snap;
+    if (assetsV !== null && snap.assetsVersion !== assetsV) document.getElementById('fontcss').href = '/fonts.css?v=' + snap.assetsVersion;
+    assetsV = snap.assetsVersion;
+    const s = withOverrides(snap.settings);
+    applyStyle(s);
+    const src = PREVIEW && !snap.channel ? fake : snap; // aperçu : vrai vocal si tu y es, sinon faux salon
+
+    const hint = PREVIEW ? '' : (snap.status === 'error' ? snap.statusMsg : HINTS[snap.status]) || '';
+    hintEl.hidden = !hint;
+    hintEl.textContent = hint;
+
+    let members = src.members.filter(m => !m.hidden);
+    if (s.hideSelf) members = members.filter(m => m.id !== src.selfId);
+    const total = members.length;
+    if (s.speakingOnly) members = members.filter(m => m.speaking);
+
+    const title = src.channel
+      ? (s.titleText || '{salon}').replaceAll('{salon}', src.channel.name).replaceAll('{nb}', total)
+      : '';
+    titleEl.hidden = !(s.showTitle && title);
+    titleEl.textContent = title;
+
+    const seen = new Set();
+    members.forEach((m, i) => {
+      let el = els.get(m.id);
+      if (!el) {
+        el = tpl.content.firstElementChild.cloneNode(true);
+        els.set(m.id, el);
+      }
+      const img = el.querySelector('.av');
+      if (img.getAttribute('src') !== m.avatar) img.src = m.avatar;
+      el.querySelector('.name').textContent = m.name;
+      el.classList.toggle('speaking', !!m.speaking);
+      el.classList.toggle('mute', m.mute && !m.deaf);
+      el.classList.toggle('deaf', m.deaf);
+      if (list.children[i] !== el) list.insertBefore(el, list.children[i] || null);
+      seen.add(m.id);
+    });
+    for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
+  }
+
+  new EventSource('/events').onmessage = e => render(JSON.parse(e.data));
+</script>
+</body>
+</html>

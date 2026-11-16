@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Overlay - Caillou feat Claude</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/fonts.css" id="fontcss">
+<style>
+  :root { --bg: #111214; --panel: #1b1c20; --line: #2c2e34; --text: #e9eaee; --dim: #9a9ca6; --accent: #8b6cff; --ok: #3ba55d; --warn: #f0b232; --bad: #f23f43; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; margin: 0; letter-spacing: .01em; }
+  #status { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+  .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; gap: 24px; padding: 24px; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 0 0 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 0; }
+  .row > span { flex: 1; }
+  .row small { display: block; color: var(--dim); font-size: 12px; }
+  .row.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+  input[type=text], input[type=password], select, textarea {
+    background: #101114; color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 9px; font: inherit; min-width: 0;
+  }
+  input[type=text], input[type=password], textarea { width: 100%; }
+  textarea { min-height: 90px; font-family: Consolas, monospace; font-size: 12.5px; resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=color] { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+  input[type=range] { width: 150px; accent-color: var(--accent); }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  .val { width: 44px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 400; }
+  button:hover { filter: brightness(1.1); }
+  a { color: #8ea1ff; }
+  ol { margin: 0 0 12px; padding-left: 20px; color: var(--dim); }
+  ol li { margin-bottom: 5px; }
+  ol b, ol code { color: var(--text); }
+  code { background: #101114; padding: 1px 5px; border-radius: 4px; font-family: Consolas, monospace; font-size: 12.5px; }
+  .err { color: var(--bad); min-height: 1.2em; margin: 6px 0 0; }
+  .url { display: flex; gap: 8px; }
+  .url input { font-family: Consolas, monospace; font-size: 12.5px; }
+  #previewBox { position: sticky; top: 24px; align-self: start; }
+  #stage { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; height: 520px; background: #3a4654; }
+  #stage.bg-dark { background: #101114; }
+  #stage.bg-light { background: #d9dce3; }
+  #stage.bg-green { background: #00b140; }
+  #stage iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--dim); font-size: 13px; }
+  .bar button { padding: 4px 10px; font-size: 12px; }
+  .person { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .person img { width: 30px; height: 30px; border-radius: 50%; background: #2b2d31; flex: none; border: 2px solid transparent; }
+  .person.speaking img { border-color: var(--ok); }
+  .person.off input[type=text] { opacity: .45; text-decoration: line-through; }
+  .person input[type=text] { flex: 1; }
+  .person button { padding: 4px 9px; }
+  .person button:disabled { opacity: .3; cursor: default; }
+  .person label { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .muted { color: var(--dim); font-size: 13px; margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/icon.png" alt="" width="34" height="34" style="border-radius:9px">
+  <h1>VOICE OVERLAY <span style="font-weight:400;color:var(--dim)">· CAILLOU FEAT CLAUDE</span></h1>
+  <div id="status"><span id="dot"></span><span id="statusText">Chargement…</span></div>
+  <span class="spacer"></span>
+  <button class="ghost" id="credBtn">Identifiants Discord</button>
+  <button class="ghost" id="resetBtn">Réinitialiser le style</button>
+</header>
+
+<main>
+  <div>
+    <section id="setup" hidden>
+      <h2>Connexion à Discord (une seule fois)</h2>
+      <ol>
+        <li>Ouvre le <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">portail développeur Discord</a> et clique sur <b>New Application</b> (le nom n'a pas d'importance).</li>
+        <li>Dans <b>OAuth2</b>, ajoute <code>http://localhost</code> dans <b>Redirects</b>, puis <b>Save Changes</b>.</li>
+        <li>Toujours dans <b>OAuth2</b>, copie le <b>Client ID</b>, puis clique sur <b>Reset Secret</b> et copie le <b>Client Secret</b>.</li>
+        <li>Colle les deux ci-dessous. Ils restent sur ton PC, dans <code>config.json</code>.</li>
+      </ol>
+      <div class="row stack"><span>Client ID</span><input type="text" id="cid" autocomplete="off" spellcheck="false"></div>
+      <div class="row stack"><span>Client Secret</span><input type="password" id="csecret" autocomplete="off" placeholder="(inchangé)"></div>
+      <p class="err" id="setupErr"></p>
+      <button id="saveCred">Enregistrer et connecter</button>
+    </section>
+
+    <section>
+      <h2>Lien pour OBS</h2>
+      <div class="url"><input type="text" id="obsUrl" readonly><button id="copyBtn">Copier</button></div>
+      <div class="row"><small>Source → Navigateur, largeur 400 et hauteur 600 pour commencer. Les réglages s'appliquent en direct, sans toucher à OBS.</small></div>
+    </section>
+
+    <section>
+      <h2>Renommer les utilisateurs</h2>
+      <p class="muted" id="peopleEmpty">Rejoins un salon vocal : les personnes présentes apparaîtront ici.</p>
+      <div id="people"></div>
+      <div id="peopleFoot" hidden>
+        <p class="muted" style="margin:8px 0">Renomme, réordonne ou masque qui tu veux. Ces changements sont oubliés quand la personne quitte ton vocal.</p>
+        <button class="ghost" id="peopleReset">Tout remettre à zéro</button>
+      </div>
+    </section>
+
+    <div id="form"></div>
+
+    <section>
+      <h2>Application</h2>
+      <div class="row" id="autoRow" hidden><span><label for="autostart">Lancer avec Windows</label><small>Démarre en arrière-plan, sans ouvrir cette page.</small></span><input type="checkbox" id="autostart"></div>
+      <div class="row"><span>Arrêter l'overlay<small>Pour le relancer, rouvre l'application.</small></span><button class="ghost" id="quitBtn">Quitter</button></div>
+    </section>
+  </div>
+
+  <div id="previewBox">
+    <div class="bar">Aperçu · fond :
+      <button class="ghost" data-bg="">Jeu</button>
+      <button class="ghost" data-bg="bg-dark">Sombre</button>
+      <button class="ghost" data-bg="bg-light">Clair</button>
+      <button class="ghost" data-bg="bg-green">Vert</button>
+    </div>
+    <div id="stage"><iframe src="/?preview" title="Aperçu de l'overlay"></iframe></div>
+  </div>
+</main>
+
+<script>
+  const SCHEMA = [
+    ['Titre', [
+      { k: 'showTitle', t: 'bool', label: 'Afficher le titre' },
+      { k: 'titleText', t: 'text', label: 'Texte du titre', help: '{salon} = nom du vocal, {nb} = nombre de personnes. Exemple : « INHOUSE · {salon} ({nb}) », ou un texte fixe.' },
+    ]],
+    ['Disposition', [
+      { k: 'layout', t: 'select', label: 'Sens', opts: { column: 'Liste verticale', row: 'En ligne (horizontal)' } },
+      { k: 'align', t: 'select', label: 'Alignement', opts: { left: 'À gauche', right: 'À droite' } },
+      { k: 'size', t: 'range', label: 'Taille des avatars', min: 20, max: 120, unit: 'px' },
+      { k: 'gap', t: 'range', label: 'Espacement', min: 0, max: 30, unit: 'px' },
+      { k: 'shape', t: 'select', label: 'Forme des avatars', opts: { circle: 'Rond', rounded: 'Carré arrondi', square: 'Carré' } },
+    ]],
+    ['Contenu', [
+      { k: 'showNames', t: 'bool', label: 'Afficher les pseudos' },
+      { k: 'showIcons', t: 'bool', label: 'Icônes micro coupé / sourd' },
+      { k: 'hideSelf', t: 'bool', label: 'Me cacher de la liste' },
+      { k: 'speakingOnly', t: 'bool', label: 'Seulement ceux qui parlent' },
+      { k: 'dimSilent', t: 'bool', label: 'Estomper ceux qui ne parlent pas' },
+    ]],
+    ['Style', [
+      { k: 'effect', t: 'select', label: 'Effet quand quelqu\'un parle', opts: { ring: 'Contour', glow: 'Halo lumineux', bounce: 'Rebond' } },
+      { k: 'speakColor', t: 'color', label: 'Couleur « parle »' },
+      { k: 'accentColor', t: 'color', label: 'Couleur d\'accent (point du titre)' },
+      { k: 'textColor', t: 'color', label: 'Couleur du texte' },
+      { k: 'bgColor', t: 'color', label: 'Couleur de fond' },
+      { k: 'bgOpacity', t: 'range', label: 'Opacité du fond', min: 0, max: 100, unit: '%' },
+      { k: 'font', t: 'font', label: 'Police' },
+      { k: 'bold', t: 'bool', label: 'Pseudos en gras' },
+      { k: 'animate', t: 'bool', label: 'Animation d\'arrivée' },
+    ]],
+    ['Avancé', [
+      { k: 'customCss', t: 'css', label: 'CSS personnalisé', help: 'Classes utiles : #title, .m, .m.speaking, .av, .name' },
+    ]],
+  ];
+  const SYSTEM_FONTS = ['Segoe UI', 'Arial', 'Verdana', 'Trebuchet MS', 'Georgia', 'Impact', 'Consolas', 'Comic Sans MS', 'Bahnschrift'];
+  let files = { builtinFonts: [], fonts: [] };
+  const loadFiles = async () => (files = await (await fetch('/api/files')).json());
+  const upload = async (kind, file) => (await fetch(`/api/upload?kind=${kind}&name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })).json();
+
+  function fillFonts(select, current) {
+    select.textContent = '';
+    const group = (label, names) => {
+      if (!names.length) return;
+      const g = el('optgroup', { label });
+      for (const n of names) { const o = el('option', { value: n, textContent: n }); o.style.fontFamily = `"${n}"`; g.append(o); }
+      select.append(g);
+    };
+    const custom = files.fonts.map(f => f.family);
+    group('Tes polices', custom);
+    group('Polices fournies', files.builtinFonts);
+    group('Polices Windows', SYSTEM_FONTS);
+    if (![...custom, ...files.builtinFonts, ...SYSTEM_FONTS].includes(current)) select.prepend(el('option', { value: current, textContent: current }));
+    select.value = current;
+  }
+
+  let settings = {}, defaults = {}, saveTimer;
+  const inputs = {};
+  const $ = id => document.getElementById(id);
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings),
+    }), 120);
+  }
+
+  function el(tag, props = {}, ...kids) {
+    const e = Object.assign(document.createElement(tag), props);
+    e.append(...kids);
+    return e;
+  }
+
+  function buildForm() {
+    const form = $('form');
+    form.textContent = '';
+    for (const [title, fields] of SCHEMA) {
+      const sec = el('section', {}, el('h2', { textContent: title }));
+      for (const f of fields) {
+        const id = 'f_' + f.k;
+        const label = el('span', {}, el('label', { htmlFor: id, textContent: f.label }));
+        if (f.help) label.append(el('small', { textContent: f.help }));
+        let input, extra = null, stack = false, after = null;
+        const set = v => { settings[f.k] = v; save(); };
+        if (f.t === 'bool') {
+          input = el('input', { type: 'checkbox', checked: settings[f.k] });
+          input.onchange = () => set(input.checked);
+        } else if (f.t === 'select') {
+          input = el('select', {}, ...Object.entries(f.opts).map(([v, t]) => el('option', { value: v, textContent: t })));
+          input.value = settings[f.k];
+          input.onchange = () => set(input.value);
+        } else if (f.t === 'range') {
+          extra = el('span', { className: 'val', textContent: settings[f.k] + f.unit });
+          input = el('input', { type: 'range', min: f.min, max: f.max, value: settings[f.k] });
+          input.oninput = () => { extra.textContent = input.value + f.unit; set(Number(input.value)); };
+        } else if (f.t === 'color') {
+          input = el('input', { type: 'color', value: settings[f.k] });
+          input.oninput = () => set(input.value);
+        } else if (f.t === 'font') {
+          input = el('select');
+          fillFonts(input, settings.font);
+          const picker = el('input', { type: 'file', accept: '.ttf,.otf,.woff,.woff2', hidden: true });
+          const add = el('button', { className: 'ghost', textContent: 'Importer une police…' });
+          const del = el('button', { className: 'ghost', textContent: 'Supprimer cette police' });
+          const msg = el('small', { className: 'err' });
+          const sync = () => { del.hidden = !files.fonts.some(x => x.family === input.value); };
+          input.onchange = () => { set(input.value); sync(); };
+          add.onclick = () => picker.click();
+          picker.onchange = async () => {
+            const file = picker.files[0];
+            picker.value = '';
+            if (!file) return;
+            const j = await upload('font', file);
+            msg.textContent = j.error || '';
+            if (j.error) return;
+            await loadFiles();
+            $('fontcss').href = '/fonts.css?v=' + Date.now();
+            fillFonts(input, j.family);
+            set(j.family); sync();
+          };
+          del.onclick = async () => {
+            const cur = files.fonts.find(x => x.family === input.value);
+            if (!cur) return;
+            await post('/api/delete-file', { kind: 'font', file: cur.file });
+            await loadFiles();
+            fillFonts(input, 'Inter');
+            set('Inter'); sync();
+          };
+          sync();
+          after = el('div', { className: 'row', style: 'justify-content:flex-start;flex-wrap:wrap' }, add, del, picker, msg,
+            el('small', { textContent: 'Formats : .ttf, .otf, .woff, .woff2. La police reste sur ton PC.' }));
+        } else if (f.t === 'css') {
+          stack = true;
+          input = el('textarea', { value: settings[f.k], spellcheck: false, placeholder: '.name { text-transform: uppercase; }' });
+          input.oninput = () => set(input.value);
+        } else {
+          stack = true;
+          input = el('input', { type: 'text', value: settings[f.k] });
+          input.oninput = () => set(input.value);
+        }
+        input.id = id;
+        inputs[f.k] = input;
+        const row = el('div', { className: 'row' + (stack ? ' stack' : '') }, label, input);
+        if (extra) row.append(extra);
+        sec.append(row);
+        if (after) sec.append(after);
+      }
+      form.append(sec);
+    }
+  }
+
+  // ----- État de la connexion -----
+  const STATUS = {
+    starting: ['Démarrage…', 'var(--dim)'],
+    setup: ['Identifiants Discord à saisir', 'var(--warn)'],
+    'no-discord': ['Discord introuvable : ouvre l\'appli Discord sur ce PC', 'var(--warn)'],
+    auth: ['Clique sur « Autoriser » dans la fenêtre Discord', 'var(--warn)'],
+    connected: ['Connecté', 'var(--ok)'],
+    error: ['Erreur', 'var(--bad)'],
+    demo: ['Mode démo (faux membres)', 'var(--accent)'],
+  };
+  let credOpen = false;
+  function showStatus(s) {
+    const [text, color] = STATUS[s.status] || STATUS.starting;
+    let t = text;
+    if (s.status === 'connected') {
+      t = `Connecté en tant que ${s.user}` + (s.channel ? ` · dans « ${s.channel.name} » (${s.members.length})` : ' · dans aucun vocal');
+    } else if (s.status === 'error') t = s.statusMsg;
+    $('statusText').textContent = t;
+    $('dot').style.background = color;
+    $('setup').hidden = !(s.status === 'setup' || credOpen);
+  }
+  // ----- Personnes dans le vocal -----
+  const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  let peopleKey = null, peopleIds = [];
+  const rows = new Map();
+  function showPeople(s) {
+    const ms = s.members;
+    $('peopleEmpty').hidden = ms.length > 0;
+    $('peopleFoot').hidden = ms.length === 0;
+    const key = ms.map(m => m.id).join(',');
+    peopleIds = ms.map(m => m.id);
+    if (key !== peopleKey) {
+      peopleKey = key;
+      const focused = document.activeElement && document.activeElement.dataset.pid;
+      $('people').textContent = '';
+      rows.clear();
+      ms.forEach((m, i) => {
+        const img = el('img', { alt: '' });
+        const name = el('input', { type: 'text', maxLength: 40 });
+        name.dataset.pid = m.id;
+        name.setAttribute('aria-label', 'Nom affiché');
+        let t;
+        name.oninput = () => { clearTimeout(t); t = setTimeout(() => post('/api/person', { id: m.id, name: name.value }), 150); };
+        const move = d => { const o = [...peopleIds]; const j = o.indexOf(m.id); const k = j + d; if (k < 0 || k >= o.length) return; [o[j], o[k]] = [o[k], o[j]]; post('/api/order', { order: o }); };
+        const up = el('button', { className: 'ghost', textContent: '▲', title: 'Monter', disabled: i === 0 });
+        const down = el('button', { className: 'ghost', textContent: '▼', title: 'Descendre', disabled: i === ms.length - 1 });
+        up.onclick = () => move(-1);
+        down.onclick = () => move(1);
+        const hide = el('input', { type: 'checkbox' });
+        hide.onchange = () => post('/api/person', { id: m.id, hidden: hide.checked });
+        const row = el('div', { className: 'person' }, img, name, up, down, el('label', {}, hide, 'Masquer'));
+        rows.set(m.id, { row, img, name, hide });
+        $('people').append(row);
+      });
+      if (focused && rows.has(focused)) rows.get(focused).name.focus();
+    }
+    for (const m of ms) {
+      const r = rows.get(m.id);
+      if (r.img.getAttribute('src') !== m.avatar) r.img.src = m.avatar;
+      r.name.placeholder = m.realName;
+      const custom = m.name !== m.realName ? m.name : '';
+      if (document.activeElement !== r.name && r.name.value !== custom) r.name.value = custom;
+      r.hide.checked = m.hidden;
+      r.row.classList.toggle('off', m.hidden);
+      r.row.classList.toggle('speaking', m.speaking);
+    }
+  }
+  $('peopleReset').onclick = () => post('/api/people-reset');
+  $('quitBtn').onclick = async () => { await post('/api/quit'); $('quitBtn').textContent = 'Arrêté'; };
+  $('autostart').onchange = async () => {
+    const r = await post('/api/autostart', { enabled: $('autostart').checked });
+    const j = await r.json();
+    $('autostart').checked = !!j.autostart;
+  };
+
+  const es = new EventSource('/events');
+  es.onmessage = e => { const s = JSON.parse(e.data); showStatus(s); showPeople(s); };
+  es.onerror = () => { $('statusText').textContent = 'L\'application est fermée : relance-la'; $('dot').style.background = 'var(--bad)'; };
+
+  // ----- Boutons -----
+  $('credBtn').onclick = () => { credOpen = !credOpen; $('setup').hidden = !credOpen; if (credOpen) $('setup').scrollIntoView({ behavior: 'smooth' }); };
+  $('saveCred').onclick = async () => {
+    $('setupErr').textContent = '';
+    const r = await fetch('/api/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: $('cid').value, clientSecret: $('csecret').value }),
+    });
+    const j = await r.json();
+    if (!r.ok) return ($('setupErr').textContent = j.error);
+    credOpen = false;
+    $('csecret').value = '';
+    $('setup').hidden = true;
+  };
+  $('resetBtn').onclick = () => { settings = { ...defaults }; buildForm(); save(); };
+  $('copyBtn').onclick = async () => {
+    $('obsUrl').select();
+    try { await navigator.clipboard.writeText($('obsUrl').value); } catch { document.execCommand('copy'); }
+    $('copyBtn').textContent = 'Copié';
+    setTimeout(() => ($('copyBtn').textContent = 'Copier'), 1500);
+  };
+  for (const b of document.querySelectorAll('[data-bg]')) b.onclick = () => ($('stage').className = b.dataset.bg);
+
+  Promise.all([fetch('/api/state').then(r => r.json()), loadFiles()]).then(([s]) => {
+    settings = s.settings; defaults = s.defaults;
+    $('cid').value = s.clientId || '';
+    $('autoRow').hidden = !s.canAutostart;
+    $('autostart').checked = !!s.autostart;
+    if (!s.hasConfig) $('csecret').placeholder = '';
+    $('obsUrl').value = `http://localhost:${s.port}/`;
+    buildForm();
+  });
+</script>
+</body>
+</html>

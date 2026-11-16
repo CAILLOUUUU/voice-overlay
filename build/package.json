@@ -1,0 +1,1 @@
+{ "name": "voice-overlay-build", "private": true, "scripts": { "build": "node build.js" }, "dependencies": { "postject": "^1.0.0-alpha.6", "resedit": "^1.7.2" } }
