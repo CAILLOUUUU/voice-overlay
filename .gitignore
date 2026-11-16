@@ -1,0 +1,12 @@
+# Clés et données personnelles : ne jamais publier
+config.json
+token.json
+settings.json
+voice-overlay.log
+polices/
+
+# Fabrication
+dist/
+build/.cache/
+build/node_modules/
+*.exe

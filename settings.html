@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Overlay - Caillou feat Claude</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/fonts.css" id="fontcss">
+<style>
+  :root { --bg: #111214; --panel: #1b1c20; --line: #2c2e34; --text: #e9eaee; --dim: #9a9ca6; --accent: #8b6cff; --ok: #3ba55d; --warn: #f0b232; --bad: #f23f43; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; margin: 0; letter-spacing: .01em; }
+  #status { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+  .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; gap: 24px; padding: 24px; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 0 0 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 0; }
+  .row > span { flex: 1; }
+  .row small { display: block; color: var(--dim); font-size: 12px; }
+  .row.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+  input[type=text], input[type=password], select, textarea {
+    background: #101114; color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 9px; font: inherit; min-width: 0;
+  }
+  input[type=text], input[type=password], textarea { width: 100%; }
+  textarea { min-height: 90px; font-family: Consolas, monospace; font-size: 12.5px; resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=color] { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+  input[type=range] { width: 150px; accent-color: var(--accent); }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  .val { width: 44px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 400; }
+  button:hover { filter: brightness(1.1); }
+  a { color: #8ea1ff; }
+  ol { margin: 0 0 12px; padding-left: 20px; color: var(--dim); }
+  ol li { margin-bottom: 5px; }
+  ol b, ol code { color: var(--text); }
+  code { background: #101114; padding: 1px 5px; border-radius: 4px; font-family: Consolas, monospace; font-size: 12.5px; }
+  .err { color: var(--bad); min-height: 1.2em; margin: 6px 0 0; }
+  .url { display: flex; gap: 8px; }
+  .url input { font-family: Consolas, monospace; font-size: 12.5px; }
+  #previewBox { position: sticky; top: 24px; align-self: start; }
+  #stage { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; height: 520px; background: #3a4654; }
+  #stage.bg-dark { background: #101114; }
+  #stage.bg-light { background: #d9dce3; }
+  #stage.bg-green { background: #00b140; }
+  #stage iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--dim); font-size: 13px; }
+  .bar button { padding: 4px 10px; font-size: 12px; }
+  .person { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .person img { width: 30px; height: 30px; border-radius: 50%; background: #2b2d31; flex: none; border: 2px solid transparent; }
+  .person.speaking img { border-color: var(--ok); }
+  .person.off input[type=text] { opacity: .45; text-decoration: line-through; }
+  .person input[type=text] { flex: 1; }
+  .person button { padding: 4px 9px; }
+  .person button:disabled { opacity: .3; cursor: default; }
+  .person label { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .muted { color: var(--dim); font-size: 13px; margin: 0; }
+  #wizard { position: fixed; inset: 0; z-index: 10; background: rgba(8, 9, 12, .92); overflow: auto; padding: 32px 16px; }
+  .wz { position: relative; max-width: 620px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; font-size: 15.5px; line-height: 1.55; }
+  .wz-x { position: absolute; top: 12px; right: 12px; padding: 2px 10px; font-size: 18px; }
+  .wz-head { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+  .wz-head img { border-radius: 12px; }
+  .wz-head b { display: block; font-size: 19px; }
+  .wz-head span { color: var(--dim); font-size: 14px; }
+  .wz-dots { display: flex; gap: 6px; margin-bottom: 18px; }
+  .wz-dots i { flex: 1; height: 5px; border-radius: 99px; background: var(--line); }
+  .wz-dots i.on { background: var(--accent); }
+  .wz-dots i.done { background: var(--ok); }
+  .wz h3 { margin: 0 0 8px; font-size: 18px; }
+  .wz p { margin: 0 0 12px; }
+  .wz ol { color: var(--text); padding-left: 22px; margin: 0 0 16px; }
+  .wz ol li { margin-bottom: 9px; }
+  .wz .k { display: inline-block; background: #2b2d36; border: 1px solid #40434f; border-radius: 5px; padding: 0 7px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .wz .big { display: block; text-align: center; background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; padding: 13px; border-radius: 9px; margin-bottom: 12px; }
+  .wz .tip { color: var(--dim); font-size: 13.5px; }
+  .wz label { display: block; margin: 14px 0 6px; }
+  .wz input { font-size: 15px; padding: 10px 12px; }
+  .copybox { display: flex; align-items: center; gap: 10px; background: #101114; border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 6px 12px; margin: 8px 0; }
+  .copybox code { flex: 1; background: none; font-size: 15px; padding: 0; }
+  .wz-state { text-align: center; padding: 10px 0 4px; }
+  .wz-state #wzIcon { font-size: 44px; line-height: 1.2; }
+  .wz-actions { display: flex; gap: 10px; justify-content: center; margin: 14px 0 4px; }
+  .wz-nav { display: flex; align-items: center; margin-top: 8px; }
+  .wz-nav button { padding: 10px 18px; }
+  [hidden] { display: none !important; }
+  #updateBar { background: #2a2350; border-bottom: 1px solid var(--accent); padding: 9px 24px; font-size: 14px; }
+  #updateBar a { font-weight: 700; margin-left: 8px; }
+  header select { padding: 6px 8px; }
+  footer { text-align: center; color: var(--dim); font-size: 12.5px; padding: 0 0 28px; }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/icon.png" alt="" width="34" height="34" style="border-radius:9px">
+  <h1>VOICE OVERLAY <span style="font-weight:400;color:var(--dim)">· CAILLOU FEAT CLAUDE</span></h1>
+  <div id="status"><span id="dot"></span><span id="statusText">…</span></div>
+  <span class="spacer"></span>
+  <select id="langSel" aria-label="Langue / Language"><option value="fr">Français</option><option value="en">English</option></select>
+  <button class="ghost" id="credBtn" data-t="credBtn"></button>
+  <button class="ghost" id="resetBtn" data-t="resetBtn"></button>
+</header>
+<div id="updateBar" hidden><span id="updateText"></span><a id="updateLink" target="_blank" rel="noopener" data-t="download"></a></div>
+
+<div id="wizard" hidden>
+  <div class="wz" role="dialog">
+    <button class="ghost wz-x" id="wzClose">×</button>
+    <div class="wz-head">
+      <img src="/icon.png" alt="" width="46" height="46">
+      <div><b data-t="wzHead"></b><span data-t="wzSub"></span></div>
+    </div>
+    <div class="wz-dots" id="wzDots"></div>
+
+    <div class="wz-step" data-t="wz1"></div>
+    <div class="wz-step" data-t="wz2" hidden></div>
+    <div class="wz-step" hidden>
+      <h3 data-t="wz3Title"></h3>
+      <p data-t="wz3Intro"></p>
+      <label for="cid" data-t="wz3Id"></label>
+      <input type="text" id="cid" autocomplete="off" spellcheck="false" data-tp="wz3IdPh">
+      <label for="csecret" data-t="wz3Secret"></label>
+      <input type="password" id="csecret" autocomplete="off">
+      <p class="tip" data-t="wz3Tip"></p>
+    </div>
+    <div class="wz-step" hidden>
+      <div class="wz-state"><div id="wzIcon">⏳</div><h3 id="wzTitle"></h3><p id="wzText"></p></div>
+      <div id="wzFail" class="wz-actions" hidden>
+        <button id="wzRetry" data-t="retry"></button>
+        <button class="ghost" id="wzFix" data-t="fixCodes"></button>
+      </div>
+      <div id="wzDone" hidden>
+        <p data-t="wzObs"></p>
+        <div class="copybox"><code id="wzUrl"></code><button data-copy="" data-t="copy"></button></div>
+        <div class="wz-actions"><button id="wzFinish" data-t="wzFinish"></button></div>
+      </div>
+    </div>
+
+    <p class="err" id="wzErr"></p>
+    <div class="wz-nav"><button class="ghost" id="wzBack" data-t="back"></button><span class="spacer"></span><button id="wzNext"></button></div>
+  </div>
+</div>
+
+<main>
+  <div>
+    <section>
+      <h2 data-t="obsTitle"></h2>
+      <div class="url"><input type="text" id="obsUrl" readonly><button id="copyBtn" data-copy="" data-t="copy"></button></div>
+      <div class="row"><small data-t="obsHelp"></small></div>
+    </section>
+
+    <section>
+      <h2 data-t="peopleTitle"></h2>
+      <p class="muted" id="peopleEmpty" data-t="peopleEmpty"></p>
+      <div id="people"></div>
+      <div id="peopleFoot" hidden>
+        <p class="muted" style="margin:8px 0" data-t="peopleHelp"></p>
+        <button class="ghost" id="peopleReset" data-t="peopleReset"></button>
+      </div>
+    </section>
+
+    <div id="form"></div>
+
+    <section>
+      <h2 data-t="styleShare"></h2>
+      <p class="muted" style="margin-bottom:10px" data-t="styleShareHelp"></p>
+      <div class="btnrow">
+        <button class="ghost" id="exportBtn" data-t="exportBtn"></button>
+        <button class="ghost" id="importBtn" data-t="importBtn"></button>
+        <input type="file" id="importPicker" accept=".json" hidden>
+      </div>
+      <p class="err" id="importMsg"></p>
+    </section>
+
+    <section>
+      <h2 data-t="appTitle"></h2>
+      <div class="row" id="autoRow" hidden><span><label for="autostart" data-t="autostart"></label><small data-t="autostartHelp"></small></span><input type="checkbox" id="autostart"></div>
+      <div class="row" id="dataRow" hidden><span><span data-t="dataLabel"></span><small id="dataPath"></small></span><button class="ghost" id="dataBtn" data-t="dataBtn"></button></div>
+      <div class="row"><span><span data-t="quitLabel"></span><small data-t="quitHelp"></small></span><button class="ghost" id="quitBtn" data-t="quit"></button></div>
+    </section>
+  </div>
+
+  <div id="previewBox">
+    <div class="bar"><span data-t="preview"></span>
+      <button class="ghost" data-bg="" data-t="bgGame"></button>
+      <button class="ghost" data-bg="bg-dark" data-t="bgDark"></button>
+      <button class="ghost" data-bg="bg-light" data-t="bgLight"></button>
+      <button class="ghost" data-bg="bg-green" data-t="bgGreen"></button>
+    </div>
+    <div id="stage"><iframe src="/?preview" title="Preview"></iframe></div>
+  </div>
+</main>
+<footer><span id="ver"></span> · <a href="/licences" target="_blank" data-t="licences"></a></footer>
+
+<script>
+  const $ = id => document.getElementById(id);
+  function el(tag, props = {}, ...kids) {
+    const e = Object.assign(document.createElement(tag), props);
+    e.append(...kids);
+    return e;
+  }
+  const K = s => `<span class="k">${s}</span>`;
+
+  // ---------- Textes (français / anglais) ----------
+  const L = {
+    fr: {
+      credBtn: 'Identifiants Discord', resetBtn: 'Réinitialiser le style', download: 'Télécharger', copy: 'Copier', copied: 'Copié ✓',
+      back: 'Retour', retry: 'Réessayer', fixCodes: 'Corriger mes codes', quit: 'Quitter', stopped: 'Arrêté',
+      updateText: v => `La version ${v} est disponible.`,
+      wzHead: 'On relie l\'overlay à ton Discord', wzSub: '4 étapes, environ 2 minutes. À faire une seule fois.',
+      wzNext: 'C\'est fait, étape suivante', wzConnect: 'Connecter',
+      wz1: `<h3>Étape 1 · Crée ta clé Discord</h3>
+        <p>Discord demande que chaque utilisateur ait sa propre « application ». C'est gratuit, ça ne publie rien, et personne d'autre ne la voit.</p>
+        <ol><li>Clique sur le bouton violet ci-dessous. Le site développeur de Discord s'ouvre (connecte-toi si on te le demande).</li>
+        <li>En haut à droite, clique sur ${K('New Application')}.</li>
+        <li>Écris un nom, par exemple <b>Voice Overlay</b>, coche la case, puis clique sur ${K('Create')}.</li></ol>
+        <a class="big" href="https://discord.com/developers/applications" target="_blank" rel="noopener">Ouvrir le site Discord ↗</a>
+        <p class="tip">Laisse l'onglet Discord ouvert, tu en as besoin pour les étapes suivantes.</p>`,
+      wz2: `<h3>Étape 2 · Ajoute l'adresse de l'overlay</h3>
+        <p>Toujours sur le site Discord, dans l'application que tu viens de créer :</p>
+        <ol><li>Dans le menu de gauche, clique sur ${K('OAuth2')}.</li>
+        <li>Dans la partie « Redirects », clique sur ${K('Add Redirect')}.</li>
+        <li>Colle cette adresse dans la case qui apparaît :
+          <div class="copybox"><code>http://localhost</code><button data-copy="http://localhost">Copier</button></div></li>
+        <li>Clique sur le bouton vert ${K('Save Changes')} qui apparaît en bas de la page.</li></ol>`,
+      wz3Title: 'Étape 3 · Copie tes deux codes',
+      wz3Intro: 'Sur la même page « OAuth2 », tout en haut, il y a deux codes à recopier ici.',
+      wz3Id: `<b>Client ID</b> : clique sur ${K('Copy')} juste en dessous, puis colle-le ici (Ctrl+V).`,
+      wz3IdPh: 'Une suite de chiffres',
+      wz3Secret: `<b>Client Secret</b> : clique sur ${K('Reset Secret')}, confirme, clique sur ${K('Copy')}, puis colle-le ici.`,
+      wz3Keep: 'Laisse vide pour garder le code actuel',
+      wz3Tip: 'Ces deux codes restent sur ton PC. Ne les montre à personne et ne les affiche pas en stream.',
+      badId: 'Le Client ID est une suite de chiffres uniquement. Recopie-le avec le bouton « Copy » du site Discord.',
+      wzObs: '<b>Dernière chose, dans OBS :</b> ajoute une source « Navigateur » et colle cette adresse dedans.',
+      wzFinish: 'Personnaliser mon overlay',
+      st: {
+        connected: u => ['✅', 'C\'est prêt !', `Tu es connecté en tant que ${u}. Il ne reste plus qu'à ajouter l'overlay dans OBS.`],
+        auth: ['👀', 'Regarde Discord', 'Une fenêtre vient de s\'ouvrir dans Discord. Clique sur le bouton « Autoriser ». Si tu ne la vois pas, clique sur l\'icône Discord dans ta barre des tâches.'],
+        'no-discord': ['💤', 'Ouvre Discord', 'Lance l\'application Discord sur ce PC (pas la version navigateur). L\'overlay se connecte tout seul dès qu\'elle est ouverte.'],
+        error: ['⚠️', 'Ça n\'a pas marché'],
+        wait: ['⏳', 'Connexion en cours…', 'Quelques secondes.'],
+      },
+      status: {
+        starting: 'Démarrage…', setup: 'Identifiants Discord à saisir', 'no-discord': 'Discord introuvable : ouvre l\'appli Discord sur ce PC',
+        auth: 'Clique sur « Autoriser » dans la fenêtre Discord', demo: 'Mode démo (faux membres)', closed: 'L\'application est fermée : relance-la',
+        connected: (u, ch, n) => `Connecté en tant que ${u}` + (ch ? ` · dans « ${ch} » (${n})` : ' · dans aucun vocal'),
+      },
+      obsTitle: 'Lien pour OBS', obsHelp: 'Source → Navigateur, largeur 400 et hauteur 600 pour commencer. Les réglages s\'appliquent en direct, sans toucher à OBS.',
+      peopleTitle: 'Renommer les utilisateurs', peopleEmpty: 'Rejoins un salon vocal : les personnes présentes apparaîtront ici.',
+      peopleHelp: 'Renomme, réordonne ou masque qui tu veux. Ces changements sont oubliés quand la personne quitte ton vocal.',
+      peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
+      styleShare: 'Partager ton style', styleShareHelp: 'Enregistre ton style dans un fichier pour le garder ou l\'envoyer à quelqu\'un, ou charge celui d\'un autre.',
+      exportBtn: 'Exporter mon style', importBtn: 'Importer un style', importOk: 'Style importé.', importBad: 'Ce fichier n\'est pas un style Voice Overlay.',
+      appTitle: 'Application', autostart: 'Lancer avec Windows', autostartHelp: 'Démarre en arrière-plan, sans ouvrir cette page.',
+      dataLabel: 'Dossier des données', dataBtn: 'Ouvrir',
+      quitLabel: 'Arrêter l\'overlay', quitHelp: 'Pour le relancer, rouvre l\'application.',
+      preview: 'Aperçu · fond :', bgGame: 'Jeu', bgDark: 'Sombre', bgLight: 'Clair', bgGreen: 'Vert',
+      licences: 'Licences des composants', version: 'Version',
+      secTitle: 'Titre', secLayout: 'Disposition', secContent: 'Contenu', secStyle: 'Style', secAdvanced: 'Avancé',
+      showTitle: 'Afficher le titre', titleText: 'Texte du titre',
+      titleHelp: '{salon} = nom du vocal, {nb} = nombre de personnes. Exemple : « INHOUSE · {salon} ({nb}) », ou un texte fixe.',
+      layout: 'Sens', column: 'Liste verticale', row: 'En ligne (horizontal)', align: 'Alignement', left: 'À gauche', right: 'À droite',
+      size: 'Taille des avatars', gap: 'Espacement', shape: 'Forme des avatars', circle: 'Rond', rounded: 'Carré arrondi', square: 'Carré',
+      showNames: 'Afficher les pseudos', showIcons: 'Icônes micro coupé / sourd', showDecorations: 'Décorations d\'avatar Discord',
+      hideSelf: 'Me cacher de la liste', speakingOnly: 'Seulement ceux qui parlent', dimSilent: 'Estomper ceux qui ne parlent pas',
+      effect: 'Effet quand quelqu\'un parle', ring: 'Contour', glow: 'Halo lumineux', bounce: 'Rebond',
+      speakColor: 'Couleur « parle »', accentColor: 'Couleur d\'accent (point du titre)', textColor: 'Couleur du texte', bgColor: 'Couleur de fond',
+      bgOpacity: 'Opacité du fond', font: 'Police', bold: 'Pseudos en gras', animate: 'Animation d\'arrivée',
+      customCss: 'CSS personnalisé', cssHelp: 'Classes utiles : #title, .m, .m.speaking, .av, .name',
+      fontMine: 'Tes polices', fontBuiltin: 'Polices fournies', fontSystem: 'Polices Windows',
+      fontAdd: 'Importer une police…', fontDel: 'Supprimer cette police', fontHelp: 'Formats : .ttf, .otf, .woff, .woff2. La police reste sur ton PC.',
+    },
+    en: {
+      credBtn: 'Discord credentials', resetBtn: 'Reset style', download: 'Download', copy: 'Copy', copied: 'Copied ✓',
+      back: 'Back', retry: 'Try again', fixCodes: 'Fix my codes', quit: 'Quit', stopped: 'Stopped',
+      updateText: v => `Version ${v} is available.`,
+      wzHead: 'Let\'s link the overlay to your Discord', wzSub: '4 steps, about 2 minutes. You only do this once.',
+      wzNext: 'Done, next step', wzConnect: 'Connect',
+      wz1: `<h3>Step 1 · Create your Discord key</h3>
+        <p>Discord requires each user to have their own "application". It's free, nothing gets published, and nobody else can see it.</p>
+        <ol><li>Click the purple button below. The Discord developer site opens (log in if asked).</li>
+        <li>In the top right, click ${K('New Application')}.</li>
+        <li>Type a name, for example <b>Voice Overlay</b>, tick the box, then click ${K('Create')}.</li></ol>
+        <a class="big" href="https://discord.com/developers/applications" target="_blank" rel="noopener">Open the Discord site ↗</a>
+        <p class="tip">Keep the Discord tab open, you need it for the next steps.</p>`,
+      wz2: `<h3>Step 2 · Add the overlay address</h3>
+        <p>Still on the Discord site, in the application you just created:</p>
+        <ol><li>In the left menu, click ${K('OAuth2')}.</li>
+        <li>In the "Redirects" section, click ${K('Add Redirect')}.</li>
+        <li>Paste this address in the box that appears:
+          <div class="copybox"><code>http://localhost</code><button data-copy="http://localhost">Copy</button></div></li>
+        <li>Click the green ${K('Save Changes')} button that appears at the bottom of the page.</li></ol>`,
+      wz3Title: 'Step 3 · Copy your two codes',
+      wz3Intro: 'On the same "OAuth2" page, at the very top, there are two codes to copy here.',
+      wz3Id: `<b>Client ID</b>: click ${K('Copy')} right below it, then paste it here (Ctrl+V).`,
+      wz3IdPh: 'A series of digits',
+      wz3Secret: `<b>Client Secret</b>: click ${K('Reset Secret')}, confirm, click ${K('Copy')}, then paste it here.`,
+      wz3Keep: 'Leave empty to keep the current code',
+      wz3Tip: 'These two codes stay on your PC. Don\'t show them to anyone and keep them off stream.',
+      badId: 'The Client ID is digits only. Copy it with the "Copy" button on the Discord site.',
+      wzObs: '<b>One last thing, in OBS:</b> add a "Browser" source and paste this address into it.',
+      wzFinish: 'Customize my overlay',
+      st: {
+        connected: u => ['✅', 'All set!', `You're connected as ${u}. All that's left is adding the overlay to OBS.`],
+        auth: ['👀', 'Look at Discord', 'A window just opened in Discord. Click the "Authorize" button. If you can\'t see it, click the Discord icon in your taskbar.'],
+        'no-discord': ['💤', 'Open Discord', 'Start the Discord app on this PC (not the browser version). The overlay connects by itself as soon as it\'s open.'],
+        error: ['⚠️', 'That didn\'t work'],
+        wait: ['⏳', 'Connecting…', 'Just a few seconds.'],
+      },
+      status: {
+        starting: 'Starting…', setup: 'Discord credentials needed', 'no-discord': 'Discord not found: open the Discord app on this PC',
+        auth: 'Click "Authorize" in the Discord window', demo: 'Demo mode (fake members)', closed: 'The app is closed: start it again',
+        connected: (u, ch, n) => `Connected as ${u}` + (ch ? ` · in "${ch}" (${n})` : ' · not in a voice channel'),
+      },
+      obsTitle: 'Link for OBS', obsHelp: 'Source → Browser, width 400 and height 600 to start. Settings apply live, no need to touch OBS.',
+      peopleTitle: 'Rename users', peopleEmpty: 'Join a voice channel: the people in it will show up here.',
+      peopleHelp: 'Rename, reorder or hide anyone. These changes are forgotten when the person leaves your voice channel.',
+      peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
+      styleShare: 'Share your style', styleShareHelp: 'Save your style to a file to keep it or send it to someone, or load someone else\'s.',
+      exportBtn: 'Export my style', importBtn: 'Import a style', importOk: 'Style imported.', importBad: 'This file is not a Voice Overlay style.',
+      appTitle: 'Application', autostart: 'Start with Windows', autostartHelp: 'Starts in the background, without opening this page.',
+      dataLabel: 'Data folder', dataBtn: 'Open',
+      quitLabel: 'Stop the overlay', quitHelp: 'To restart it, open the application again.',
+      preview: 'Preview · background:', bgGame: 'Game', bgDark: 'Dark', bgLight: 'Light', bgGreen: 'Green',
+      licences: 'Component licenses', version: 'Version',
+      secTitle: 'Title', secLayout: 'Layout', secContent: 'Content', secStyle: 'Style', secAdvanced: 'Advanced',
+      showTitle: 'Show the title', titleText: 'Title text',
+      titleHelp: '{salon} = voice channel name, {nb} = number of people. Example: "INHOUSE · {salon} ({nb})", or any fixed text.',
+      layout: 'Direction', column: 'Vertical list', row: 'In a row (horizontal)', align: 'Alignment', left: 'Left', right: 'Right',
+      size: 'Avatar size', gap: 'Spacing', shape: 'Avatar shape', circle: 'Round', rounded: 'Rounded square', square: 'Square',
+      showNames: 'Show names', showIcons: 'Muted / deafened icons', showDecorations: 'Discord avatar decorations',
+      hideSelf: 'Hide me from the list', speakingOnly: 'Only people speaking', dimSilent: 'Dim people who aren\'t speaking',
+      effect: 'Effect when someone speaks', ring: 'Outline', glow: 'Glow', bounce: 'Bounce',
+      speakColor: 'Speaking color', accentColor: 'Accent color (title dot)', textColor: 'Text color', bgColor: 'Background color',
+      bgOpacity: 'Background opacity', font: 'Font', bold: 'Bold names', animate: 'Entrance animation',
+      customCss: 'Custom CSS', cssHelp: 'Useful classes: #title, .m, .m.speaking, .av, .name',
+      fontMine: 'Your fonts', fontBuiltin: 'Included fonts', fontSystem: 'Windows fonts',
+      fontAdd: 'Import a font…', fontDel: 'Delete this font', fontHelp: 'Formats: .ttf, .otf, .woff, .woff2. The font stays on your PC.',
+    },
+  };
+  let lang = 'fr', S = L.fr;
+  const msg = x => !x ? '' : typeof x === 'string' ? x : (x[lang] || x.fr || '');
+
+  const schema = () => [
+    [S.secTitle, [
+      { k: 'showTitle', t: 'bool', label: S.showTitle },
+      { k: 'titleText', t: 'text', label: S.titleText, help: S.titleHelp },
+    ]],
+    [S.secLayout, [
+      { k: 'layout', t: 'select', label: S.layout, opts: { column: S.column, row: S.row } },
+      { k: 'align', t: 'select', label: S.align, opts: { left: S.left, right: S.right } },
+      { k: 'size', t: 'range', label: S.size, min: 20, max: 120, unit: 'px' },
+      { k: 'gap', t: 'range', label: S.gap, min: 0, max: 30, unit: 'px' },
+      { k: 'shape', t: 'select', label: S.shape, opts: { circle: S.circle, rounded: S.rounded, square: S.square } },
+    ]],
+    [S.secContent, [
+      { k: 'showNames', t: 'bool', label: S.showNames },
+      { k: 'showIcons', t: 'bool', label: S.showIcons },
+      { k: 'showDecorations', t: 'bool', label: S.showDecorations },
+      { k: 'hideSelf', t: 'bool', label: S.hideSelf },
+      { k: 'speakingOnly', t: 'bool', label: S.speakingOnly },
+      { k: 'dimSilent', t: 'bool', label: S.dimSilent },
+    ]],
+    [S.secStyle, [
+      { k: 'effect', t: 'select', label: S.effect, opts: { ring: S.ring, glow: S.glow, bounce: S.bounce } },
+      { k: 'speakColor', t: 'color', label: S.speakColor },
+      { k: 'accentColor', t: 'color', label: S.accentColor },
+      { k: 'textColor', t: 'color', label: S.textColor },
+      { k: 'bgColor', t: 'color', label: S.bgColor },
+      { k: 'bgOpacity', t: 'range', label: S.bgOpacity, min: 0, max: 100, unit: '%' },
+      { k: 'font', t: 'font', label: S.font },
+      { k: 'bold', t: 'bool', label: S.bold },
+      { k: 'animate', t: 'bool', label: S.animate },
+    ]],
+    [S.secAdvanced, [
+      { k: 'customCss', t: 'css', label: S.customCss, help: S.cssHelp },
+    ]],
+  ];
+
+  // ---------- Réglages ----------
+  const SYSTEM_FONTS = ['Segoe UI', 'Arial', 'Verdana', 'Trebuchet MS', 'Georgia', 'Impact', 'Consolas', 'Comic Sans MS', 'Bahnschrift'];
+  let settings = {}, defaults = {}, saveTimer;
+  let files = { builtinFonts: [], fonts: [] };
+  const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const loadFiles = async () => (files = await (await fetch('/api/files')).json());
+  const upload = async (kind, file) => (await fetch(`/api/upload?kind=${kind}&name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })).json();
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => post('/api/settings', settings), 120);
+  }
+
+  function fillFonts(select, current) {
+    select.textContent = '';
+    const group = (label, names) => {
+      if (!names.length) return;
+      const g = el('optgroup', { label });
+      for (const n of names) { const o = el('option', { value: n, textContent: n }); o.style.fontFamily = `"${n}"`; g.append(o); }
+      select.append(g);
+    };
+    const custom = files.fonts.map(f => f.family);
+    group(S.fontMine, custom);
+    group(S.fontBuiltin, files.builtinFonts);
+    group(S.fontSystem, SYSTEM_FONTS);
+    if (![...custom, ...files.builtinFonts, ...SYSTEM_FONTS].includes(current)) select.prepend(el('option', { value: current, textContent: current }));
+    select.value = current;
+  }
+
+  function buildForm() {
+    const form = $('form');
+    form.textContent = '';
+    for (const [title, fields] of schema()) {
+      const sec = el('section', {}, el('h2', { textContent: title }));
+      for (const f of fields) {
+        const id = 'f_' + f.k;
+        const label = el('span', {}, el('label', { htmlFor: id, textContent: f.label }));
+        if (f.help) label.append(el('small', { textContent: f.help }));
+        let input, extra = null, stack = false, after = null;
+        const set = v => { settings[f.k] = v; save(); };
+        if (f.t === 'bool') {
+          input = el('input', { type: 'checkbox', checked: settings[f.k] });
+          input.onchange = () => set(input.checked);
+        } else if (f.t === 'select') {
+          input = el('select', {}, ...Object.entries(f.opts).map(([v, t]) => el('option', { value: v, textContent: t })));
+          input.value = settings[f.k];
+          input.onchange = () => set(input.value);
+        } else if (f.t === 'range') {
+          extra = el('span', { className: 'val', textContent: settings[f.k] + f.unit });
+          input = el('input', { type: 'range', min: f.min, max: f.max, value: settings[f.k] });
+          input.oninput = () => { extra.textContent = input.value + f.unit; set(Number(input.value)); };
+        } else if (f.t === 'color') {
+          input = el('input', { type: 'color', value: settings[f.k] });
+          input.oninput = () => set(input.value);
+        } else if (f.t === 'font') {
+          input = el('select');
+          fillFonts(input, settings.font);
+          const picker = el('input', { type: 'file', accept: '.ttf,.otf,.woff,.woff2', hidden: true });
+          const add = el('button', { className: 'ghost', textContent: S.fontAdd });
+          const del = el('button', { className: 'ghost', textContent: S.fontDel });
+          const err = el('small', { className: 'err' });
+          const sync = () => { del.hidden = !files.fonts.some(x => x.family === input.value); };
+          input.onchange = () => { set(input.value); sync(); };
+          add.onclick = () => picker.click();
+          picker.onchange = async () => {
+            const file = picker.files[0];
+            picker.value = '';
+            if (!file) return;
+            const j = await upload('font', file);
+            err.textContent = msg(j.error);
+            if (j.error) return;
+            await loadFiles();
+            $('fontcss').href = '/fonts.css?v=' + Date.now();
+            fillFonts(input, j.family);
+            set(j.family); sync();
+          };
+          del.onclick = async () => {
+            const cur = files.fonts.find(x => x.family === input.value);
+            if (!cur) return;
+            await post('/api/delete-file', { kind: 'font', file: cur.file });
+            await loadFiles();
+            fillFonts(input, 'Inter');
+            set('Inter'); sync();
+          };
+          sync();
+          after = el('div', { className: 'row', style: 'justify-content:flex-start;flex-wrap:wrap' }, add, del, picker, err, el('small', { textContent: S.fontHelp }));
+        } else if (f.t === 'css') {
+          stack = true;
+          input = el('textarea', { value: settings[f.k], spellcheck: false, placeholder: '.name { text-transform: uppercase; }' });
+          input.oninput = () => set(input.value);
+        } else {
+          stack = true;
+          input = el('input', { type: 'text', value: settings[f.k] });
+          input.oninput = () => set(input.value);
+        }
+        input.id = id;
+        const row = el('div', { className: 'row' + (stack ? ' stack' : '') }, label, input);
+        if (extra) row.append(extra);
+        sec.append(row);
+        if (after) sec.append(after);
+      }
+      form.append(sec);
+    }
+  }
+
+  // ---------- État de la connexion ----------
+  const COLORS = { starting: 'var(--dim)', setup: 'var(--warn)', 'no-discord': 'var(--warn)', auth: 'var(--warn)', connected: 'var(--ok)', error: 'var(--bad)', demo: 'var(--accent)' };
+  function showStatus(s) {
+    let t = S.status[s.status] || S.status.starting;
+    if (s.status === 'connected') t = S.status.connected(s.user, s.channel && s.channel.name, s.members.length);
+    else if (s.status === 'error') t = msg(s.statusMsg);
+    $('statusText').textContent = t;
+    $('dot').style.background = COLORS[s.status] || COLORS.starting;
+    $('updateBar').hidden = !s.update;
+    if (s.update) { $('updateText').textContent = S.updateText(s.update.version); $('updateLink').href = s.update.url; }
+    wizardTick(s);
+  }
+
+  // ---------- Renommer les utilisateurs ----------
+  let peopleKey = null, peopleIds = [];
+  const rows = new Map();
+  function showPeople(s) {
+    const ms = s.members;
+    $('peopleEmpty').hidden = ms.length > 0;
+    $('peopleFoot').hidden = ms.length === 0;
+    const key = ms.map(m => m.id).join(',');
+    peopleIds = ms.map(m => m.id);
+    if (key !== peopleKey) {
+      peopleKey = key;
+      const focused = document.activeElement && document.activeElement.dataset.pid;
+      $('people').textContent = '';
+      rows.clear();
+      ms.forEach((m, i) => {
+        const img = el('img', { alt: '' });
+        const name = el('input', { type: 'text', maxLength: 40 });
+        name.dataset.pid = m.id;
+        name.setAttribute('aria-label', S.shownName);
+        let t;
+        name.oninput = () => { clearTimeout(t); t = setTimeout(() => post('/api/person', { id: m.id, name: name.value }), 150); };
+        const move = d => { const o = [...peopleIds]; const j = o.indexOf(m.id); const k = j + d; if (k < 0 || k >= o.length) return; [o[j], o[k]] = [o[k], o[j]]; post('/api/order', { order: o }); };
+        const up = el('button', { className: 'ghost', textContent: '▲', title: S.up, disabled: i === 0 });
+        const down = el('button', { className: 'ghost', textContent: '▼', title: S.down, disabled: i === ms.length - 1 });
+        up.onclick = () => move(-1);
+        down.onclick = () => move(1);
+        const hide = el('input', { type: 'checkbox' });
+        hide.onchange = () => post('/api/person', { id: m.id, hidden: hide.checked });
+        const row = el('div', { className: 'person' }, img, name, up, down, el('label', {}, hide, S.hide));
+        rows.set(m.id, { row, img, name, hide });
+        $('people').append(row);
+      });
+      if (focused && rows.has(focused)) rows.get(focused).name.focus();
+    }
+    for (const m of ms) {
+      const r = rows.get(m.id);
+      if (r.img.getAttribute('src') !== m.avatar) r.img.src = m.avatar;
+      r.name.placeholder = m.realName;
+      const custom = m.name !== m.realName ? m.name : '';
+      if (document.activeElement !== r.name && r.name.value !== custom) r.name.value = custom;
+      r.hide.checked = m.hidden;
+      r.row.classList.toggle('off', m.hidden);
+      r.row.classList.toggle('speaking', m.speaking);
+    }
+  }
+
+  // ---------- Assistant de première utilisation ----------
+  const wz = { open: false, step: 0, seen: false, last: null };
+  const panels = [...document.querySelectorAll('.wz-step')];
+  function wzShow(step) {
+    wz.open = true;
+    wz.step = step;
+    $('wizard').hidden = false;
+    panels.forEach((p, i) => (p.hidden = i !== step));
+    $('wzDots').textContent = '';
+    for (let i = 0; i < 4; i++) $('wzDots').append(el('i', { className: i < step ? 'done' : i === step ? 'on' : '' }));
+    $('wzBack').hidden = step === 0 || step === 3;
+    $('wzNext').hidden = step === 3;
+    $('wzNext').textContent = step === 2 ? S.wzConnect : S.wzNext;
+    $('wzErr').textContent = '';
+    if (step === 3) wzState();
+    $('wizard').scrollTop = 0;
+  }
+  function wzClose() { wz.open = false; $('wizard').hidden = true; }
+  function wzState() {
+    const s = wz.last;
+    if (!s) return;
+    let v = S.st[s.status] || S.st.wait;
+    if (s.status === 'connected') v = S.st.connected(s.user);
+    if (s.status === 'error') v = [...S.st.error, msg(s.statusMsg)];
+    $('wzIcon').textContent = v[0];
+    $('wzTitle').textContent = v[1];
+    $('wzText').textContent = v[2];
+    $('wzFail').hidden = s.status !== 'error';
+    $('wzDone').hidden = s.status !== 'connected';
+  }
+  function wizardTick(s) {
+    wz.last = s;
+    if (!wz.seen) { wz.seen = true; if (s.status === 'setup') wzShow(0); }
+    if (wz.open && wz.step === 3) wzState();
+  }
+
+  function bind() {
+    $('wzBack').onclick = () => wzShow(wz.step - 1);
+    $('wzNext').onclick = async () => {
+      if (wz.step < 2) return wzShow(wz.step + 1);
+      const id = $('cid').value.trim(), secret = $('csecret').value.trim();
+      if (!/^\d{15,22}$/.test(id)) return ($('wzErr').textContent = S.badId);
+      const r = await post('/api/config', { clientId: id, clientSecret: secret });
+      const j = await r.json();
+      if (!r.ok) return ($('wzErr').textContent = msg(j.error));
+      $('csecret').value = '';
+      wzShow(3);
+    };
+    for (const id of ['cid', 'csecret']) $(id).addEventListener('input', () => ($('wzErr').textContent = ''));
+    $('wzClose').onclick = wzClose;
+    $('wzFinish').onclick = wzClose;
+    $('wzFix').onclick = () => wzShow(2);
+    $('wzRetry').onclick = () => post('/api/retry');
+    $('credBtn').onclick = () => wzShow(0);
+    for (const b of document.querySelectorAll('[data-copy]')) b.onclick = async () => {
+      const text = b.dataset.copy || $('obsUrl').value;
+      try { await navigator.clipboard.writeText(text); } catch {}
+      const old = b.textContent;
+      b.textContent = S.copied;
+      setTimeout(() => (b.textContent = old), 1500);
+    };
+    for (const b of document.querySelectorAll('[data-bg]')) b.onclick = () => ($('stage').className = b.dataset.bg);
+
+    $('peopleReset').onclick = () => post('/api/people-reset');
+    $('dataBtn').onclick = () => post('/api/open-data');
+    $('quitBtn').onclick = async () => { await post('/api/quit'); $('quitBtn').textContent = S.stopped; };
+    $('autostart').onchange = async () => {
+      const j = await (await post('/api/autostart', { enabled: $('autostart').checked })).json();
+      $('autostart').checked = !!j.autostart;
+    };
+    $('resetBtn').onclick = () => { settings = { ...defaults, lang: settings.lang }; buildForm(); save(); };
+
+    // Langue : on enregistre puis on recharge la page
+    $('langSel').value = lang;
+    $('langSel').onchange = async () => { settings.lang = $('langSel').value; clearTimeout(saveTimer); await post('/api/settings', settings); location.reload(); };
+
+    // Export / import du style
+    $('exportBtn').onclick = () => {
+      const style = { ...settings };
+      delete style.lang;
+      const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify({ voiceOverlayStyle: 1, style }, null, 2)], { type: 'application/json' })), download: 'voice-overlay-style.json' });
+      document.body.append(a);
+      a.click();
+      a.remove();
+    };
+    $('importBtn').onclick = () => $('importPicker').click();
+    $('importPicker').onchange = async () => {
+      const file = $('importPicker').files[0];
+      $('importPicker').value = '';
+      if (!file) return;
+      let data = null;
+      try { data = JSON.parse(await file.text()); } catch {}
+      const ok = data && data.voiceOverlayStyle === 1 && data.style && typeof data.style === 'object';
+      $('importMsg').style.color = ok ? 'var(--ok)' : '';
+      $('importMsg').textContent = ok ? S.importOk : S.importBad;
+      if (!ok) return;
+      for (const k of Object.keys(defaults)) if (k !== 'lang' && k in data.style && typeof data.style[k] === typeof defaults[k]) settings[k] = data.style[k];
+      buildForm();
+      save();
+    };
+  }
+
+  // ---------- Démarrage ----------
+  (async () => {
+    const [s] = await Promise.all([fetch('/api/state').then(r => r.json()), loadFiles()]);
+    settings = s.settings;
+    defaults = s.defaults;
+    lang = settings.lang === 'fr' || settings.lang === 'en' ? settings.lang : ((navigator.language || '').toLowerCase().startsWith('fr') ? 'fr' : 'en');
+    S = L[lang];
+    document.documentElement.lang = lang;
+    for (const e of document.querySelectorAll('[data-t]')) e.innerHTML = S[e.dataset.t];
+    for (const e of document.querySelectorAll('[data-tp]')) e.placeholder = S[e.dataset.tp];
+
+    $('cid').value = s.clientId || '';
+    if (s.hasConfig) $('csecret').placeholder = S.wz3Keep;
+    $('autoRow').hidden = !s.canAutostart;
+    $('dataRow').hidden = !s.isExe;
+    $('dataPath').textContent = s.dataDir;
+    $('autostart').checked = !!s.autostart;
+    $('obsUrl').value = `http://localhost:${s.port}/`;
+    $('wzUrl').textContent = $('obsUrl').value;
+    $('ver').textContent = `${S.version} ${s.version}`;
+    bind();
+    buildForm();
+
+    const es = new EventSource('/events');
+    es.onmessage = e => { const snap = JSON.parse(e.data); showStatus(snap); showPeople(snap); };
+    es.onerror = () => { $('statusText').textContent = S.status.closed; $('dot').style.background = 'var(--bad)'; };
+  })();
+</script>
+</body>
+</html>
