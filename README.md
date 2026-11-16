@@ -56,4 +56,4 @@ node server.js --demo     # fake members, no Discord needed
 
 ## Credits
 
-Made by Caillou, built with Claude. Bundles Node.js and open fonts: see [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
+Made by Caillou, built with Claude. Released under the [MIT License](LICENSE). Bundles Node.js and open fonts: see [LICENCES-TIERS.txt](LICENCES-TIERS.txt).

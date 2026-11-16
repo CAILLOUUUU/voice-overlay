@@ -41,4 +41,4 @@ Le fichier `voice-overlay.log`, à côté du `.exe`, dit ce qui s'est passé.
 
 ## Crédits
 
-Fait par Caillou, construit avec Claude. Embarque Node.js et des polices libres : voir [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
+Fait par Caillou, construit avec Claude. Publié sous [licence MIT](LICENSE). Embarque Node.js et des polices libres : voir [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
