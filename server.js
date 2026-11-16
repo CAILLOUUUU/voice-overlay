@@ -5,7 +5,7 @@
 //   node server.js          -> mode normal (Discord desktop doit être ouvert)
 //   node server.js --open   -> pareil + ouvre la page de réglages
 //   node server.js --demo   -> faux membres (sans Discord)
-// Ce même fichier est aussi embarqué tel quel dans "Voice Overlay - CAILLOU X CLAUDE.exe".
+// Ce même fichier est aussi embarqué tel quel dans "Voice Overlay - CAILLOU FEAT CLAUDE.exe".
 
 const net = require('net');
 const http = require('http');
@@ -418,6 +418,9 @@ async function handleApi(url, req, res) {
       if (!canAutostart) return sendJson(res, 400, { error: 'Disponible uniquement avec le .exe sous Windows.' });
       await setAutostart(!!b.enabled);
       return sendJson(res, 200, { ok: true, autostart: await getAutostart() });
+    case '/api/retry':
+      restartRequested = true;
+      return sendJson(res, 200, { ok: true });
     case '/api/quit':
       sendJson(res, 200, { ok: true });
       console.log('Fermeture demandée depuis la page de réglages.');
@@ -584,7 +587,13 @@ class DiscordRPC {
   }
 
   _onClose() {
-    const err = new Error(this.closeReason ? `Discord a refusé la connexion : ${this.closeReason}` : 'Connexion Discord fermée');
+    let err = new Error('Connexion Discord fermée');
+    if (this.closeReason) {
+      err = new Error(/client.?id/i.test(this.closeReason)
+        ? 'Discord ne reconnaît pas ce Client ID. Vérifie que tu l\'as bien copié.'
+        : `Discord a refusé la connexion : ${this.closeReason}`);
+      err.code = 'BLOCKED';
+    }
     if (this._fail) { this._fail(err); this._fail = null; }
     for (const { reject } of this.pending.values()) reject(err);
     this.pending.clear();
@@ -611,7 +620,13 @@ async function exchangeToken(params) {
     body,
   });
   const j = await r.json();
-  if (!r.ok) throw new Error(`Discord a refusé les identifiants (${j.error || r.status}). Vérifie le Client ID, le Client Secret et la redirection http://localhost.`);
+  if (!r.ok) {
+    const e = new Error(j.error === 'invalid_client'
+      ? 'Le Client Secret n\'est pas le bon. Refais « Reset Secret » sur le site Discord et colle le nouveau.'
+      : `Discord a refusé les codes (${j.error || r.status}). Vérifie le Client ID, le Client Secret et l'adresse http://localhost dans « Redirects ».`);
+    e.code = 'BLOCKED';
+    throw e;
+  }
   fs.writeFileSync(TOKEN_PATH, JSON.stringify(j, null, 2));
   return j;
 }
@@ -628,7 +643,14 @@ async function authenticate(rpc) {
     }
   }
   setStatus('auth', 'Une fenêtre s\'est ouverte dans Discord : clique sur "Autoriser".');
-  const { code } = await rpc.request('AUTHORIZE', { client_id: config.clientId, scopes: ['rpc', 'identify'] });
+  let code;
+  try {
+    ({ code } = await rpc.request('AUTHORIZE', { client_id: config.clientId, scopes: ['rpc', 'identify'] }));
+  } catch (err) {
+    const e = new Error(`L'autorisation Discord a été refusée ou fermée. Clique sur « Réessayer », puis sur « Autoriser » dans Discord. (${err.message})`);
+    e.code = 'BLOCKED';
+    throw e;
+  }
   tok = await exchangeToken({ grant_type: 'authorization_code', code, redirect_uri: config.redirectUri });
   return rpc.request('AUTHENTICATE', { access_token: tok.access_token });
 }
@@ -719,6 +741,7 @@ async function pause(ms) {
 async function run() {
   for (;;) {
     restartRequested = false;
+    let blocked = false;
     if (!hasConfig()) {
       setStatus('setup', 'Identifiants Discord manquants : ouvre la page de réglages pour les saisir.');
       await pause(3600000);
@@ -741,14 +764,15 @@ async function run() {
       if (rpc && rpc.sock) rpc.sock.destroy();
       if (!restartRequested) {
         if (e.code === 'NO_DISCORD') setStatus('no-discord', 'Discord introuvable : l\'appli Discord (desktop) est bien ouverte ?');
-        else setStatus('error', e.message);
+        else { blocked = e.code === 'BLOCKED'; setStatus('error', e.message); }
       }
     }
     currentChannel = null;
     resetState();
     prunePeople();
     broadcast();
-    await pause(5000);
+    // Erreur qui demande une action de l'utilisateur : on attend qu'il corrige ou clique sur « Réessayer ».
+    await pause(blocked ? 3600000 : 5000);
   }
 }
 

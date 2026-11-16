@@ -62,6 +62,33 @@
   .person button:disabled { opacity: .3; cursor: default; }
   .person label { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; white-space: nowrap; }
   .muted { color: var(--dim); font-size: 13px; margin: 0; }
+  #wizard { position: fixed; inset: 0; z-index: 10; background: rgba(8, 9, 12, .92); overflow: auto; padding: 32px 16px; }
+  .wz { position: relative; max-width: 620px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; font-size: 15.5px; line-height: 1.55; }
+  .wz-x { position: absolute; top: 12px; right: 12px; padding: 2px 10px; font-size: 18px; }
+  .wz-head { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+  .wz-head img { border-radius: 12px; }
+  .wz-head b { display: block; font-size: 19px; }
+  .wz-head span { color: var(--dim); font-size: 14px; }
+  .wz-dots { display: flex; gap: 6px; margin-bottom: 18px; }
+  .wz-dots i { flex: 1; height: 5px; border-radius: 99px; background: var(--line); }
+  .wz-dots i.on { background: var(--accent); }
+  .wz-dots i.done { background: var(--ok); }
+  .wz h3 { margin: 0 0 8px; font-size: 18px; }
+  .wz p { margin: 0 0 12px; }
+  .wz ol { color: var(--text); padding-left: 22px; margin: 0 0 16px; }
+  .wz ol li { margin-bottom: 9px; }
+  .wz .k { display: inline-block; background: #2b2d36; border: 1px solid #40434f; border-radius: 5px; padding: 0 7px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .wz .big { display: block; text-align: center; background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; padding: 13px; border-radius: 9px; margin-bottom: 12px; }
+  .wz .tip { color: var(--dim); font-size: 13.5px; }
+  .wz label { display: block; margin: 14px 0 6px; }
+  .wz input { font-size: 15px; padding: 10px 12px; }
+  .copybox { display: flex; align-items: center; gap: 10px; background: #101114; border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 6px 12px; margin: 8px 0; }
+  .copybox code { flex: 1; background: none; font-size: 15px; padding: 0; }
+  .wz-state { text-align: center; padding: 10px 0 4px; }
+  .wz-state #wzIcon { font-size: 44px; line-height: 1.2; }
+  .wz-actions { display: flex; gap: 10px; justify-content: center; margin: 14px 0 4px; }
+  .wz-nav { display: flex; align-items: center; margin-top: 8px; }
+  .wz-nav button { padding: 10px 18px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -75,22 +102,69 @@
   <button class="ghost" id="resetBtn">Réinitialiser le style</button>
 </header>
 
+<div id="wizard" hidden>
+  <div class="wz" role="dialog" aria-label="Première utilisation">
+    <button class="ghost wz-x" id="wzClose" title="Fermer">×</button>
+    <div class="wz-head">
+      <img src="/icon.png" alt="" width="46" height="46">
+      <div><b>On relie l'overlay à ton Discord</b><span>4 étapes, environ 2 minutes. À faire une seule fois.</span></div>
+    </div>
+    <div class="wz-dots" id="wzDots"></div>
+
+    <div class="wz-step">
+      <h3>Étape 1 · Crée ta clé Discord</h3>
+      <p>Discord demande que chaque utilisateur ait sa propre « application ». C'est gratuit, ça ne publie rien, et personne d'autre ne la voit.</p>
+      <ol>
+        <li>Clique sur le bouton violet ci-dessous. Le site développeur de Discord s'ouvre (connecte-toi si on te le demande).</li>
+        <li>En haut à droite, clique sur <span class="k">New Application</span>.</li>
+        <li>Écris un nom, par exemple <b>Voice Overlay</b>, coche la case, puis clique sur <span class="k">Create</span>.</li>
+      </ol>
+      <a class="big" href="https://discord.com/developers/applications" target="_blank" rel="noopener">Ouvrir le site Discord ↗</a>
+      <p class="tip">Laisse l'onglet Discord ouvert, tu en as besoin pour les étapes suivantes.</p>
+    </div>
+
+    <div class="wz-step" hidden>
+      <h3>Étape 2 · Ajoute l'adresse de l'overlay</h3>
+      <p>Toujours sur le site Discord, dans l'application que tu viens de créer :</p>
+      <ol>
+        <li>Dans le menu de gauche, clique sur <span class="k">OAuth2</span>.</li>
+        <li>Dans la partie « Redirects », clique sur <span class="k">Add Redirect</span>.</li>
+        <li>Colle cette adresse dans la case qui apparaît :
+          <div class="copybox"><code>http://localhost</code><button data-copy="http://localhost">Copier</button></div></li>
+        <li>Clique sur le bouton vert <span class="k">Save Changes</span> qui apparaît en bas de la page.</li>
+      </ol>
+    </div>
+
+    <div class="wz-step" hidden>
+      <h3>Étape 3 · Copie tes deux codes</h3>
+      <p>Sur la même page « OAuth2 », tout en haut, il y a deux codes à recopier ici.</p>
+      <label for="cid"><b>Client ID</b> : clique sur <span class="k">Copy</span> juste en dessous, puis colle-le ici (Ctrl+V).</label>
+      <input type="text" id="cid" autocomplete="off" spellcheck="false" placeholder="Une suite de chiffres">
+      <label for="csecret"><b>Client Secret</b> : clique sur <span class="k">Reset Secret</span>, confirme, clique sur <span class="k">Copy</span>, puis colle-le ici.</label>
+      <input type="password" id="csecret" autocomplete="off">
+      <p class="tip">Ces deux codes restent sur ton PC. Ne les montre à personne et ne les affiche pas en stream.</p>
+    </div>
+
+    <div class="wz-step" hidden>
+      <div class="wz-state"><div id="wzIcon">⏳</div><h3 id="wzTitle">Connexion en cours…</h3><p id="wzText"></p></div>
+      <div id="wzFail" class="wz-actions" hidden>
+        <button id="wzRetry">Réessayer</button>
+        <button class="ghost" id="wzFix">Corriger mes codes</button>
+      </div>
+      <div id="wzDone" hidden>
+        <p><b>Dernière chose, dans OBS :</b> ajoute une source « Navigateur » et colle cette adresse dedans.</p>
+        <div class="copybox"><code>http://localhost:3000/</code><button data-copy="">Copier</button></div>
+        <div class="wz-actions"><button id="wzFinish">Personnaliser mon overlay</button></div>
+      </div>
+    </div>
+
+    <p class="err" id="wzErr"></p>
+    <div class="wz-nav"><button class="ghost" id="wzBack">Retour</button><span class="spacer"></span><button id="wzNext">Suivant</button></div>
+  </div>
+</div>
+
 <main>
   <div>
-    <section id="setup" hidden>
-      <h2>Connexion à Discord (une seule fois)</h2>
-      <ol>
-        <li>Ouvre le <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">portail développeur Discord</a> et clique sur <b>New Application</b> (le nom n'a pas d'importance).</li>
-        <li>Dans <b>OAuth2</b>, ajoute <code>http://localhost</code> dans <b>Redirects</b>, puis <b>Save Changes</b>.</li>
-        <li>Toujours dans <b>OAuth2</b>, copie le <b>Client ID</b>, puis clique sur <b>Reset Secret</b> et copie le <b>Client Secret</b>.</li>
-        <li>Colle les deux ci-dessous. Ils restent sur ton PC, dans <code>config.json</code>.</li>
-      </ol>
-      <div class="row stack"><span>Client ID</span><input type="text" id="cid" autocomplete="off" spellcheck="false"></div>
-      <div class="row stack"><span>Client Secret</span><input type="password" id="csecret" autocomplete="off" placeholder="(inchangé)"></div>
-      <p class="err" id="setupErr"></p>
-      <button id="saveCred">Enregistrer et connecter</button>
-    </section>
-
     <section>
       <h2>Lien pour OBS</h2>
       <div class="url"><input type="text" id="obsUrl" readonly><button id="copyBtn">Copier</button></div>
@@ -288,7 +362,6 @@
     error: ['Erreur', 'var(--bad)'],
     demo: ['Mode démo (faux membres)', 'var(--accent)'],
   };
-  let credOpen = false;
   function showStatus(s) {
     const [text, color] = STATUS[s.status] || STATUS.starting;
     let t = text;
@@ -297,7 +370,7 @@
     } else if (s.status === 'error') t = s.statusMsg;
     $('statusText').textContent = t;
     $('dot').style.background = color;
-    $('setup').hidden = !(s.status === 'setup' || credOpen);
+    wizardTick(s);
   }
   // ----- Personnes dans le vocal -----
   const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -357,20 +430,69 @@
   es.onmessage = e => { const s = JSON.parse(e.data); showStatus(s); showPeople(s); };
   es.onerror = () => { $('statusText').textContent = 'L\'application est fermée : relance-la'; $('dot').style.background = 'var(--bad)'; };
 
-  // ----- Boutons -----
-  $('credBtn').onclick = () => { credOpen = !credOpen; $('setup').hidden = !credOpen; if (credOpen) $('setup').scrollIntoView({ behavior: 'smooth' }); };
-  $('saveCred').onclick = async () => {
-    $('setupErr').textContent = '';
-    const r = await fetch('/api/config', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: $('cid').value, clientSecret: $('csecret').value }),
-    });
+  // ----- Assistant de première utilisation -----
+  const wz = { open: false, step: 0, seen: false, last: null };
+  const panels = [...document.querySelectorAll('.wz-step')];
+  function wzShow(step) {
+    wz.open = true;
+    wz.step = step;
+    $('wizard').hidden = false;
+    panels.forEach((p, i) => (p.hidden = i !== step));
+    $('wzDots').textContent = '';
+    for (let i = 0; i < 4; i++) $('wzDots').append(el('i', { className: i < step ? 'done' : i === step ? 'on' : '' }));
+    $('wzBack').hidden = step === 0 || step === 3;
+    $('wzNext').hidden = step === 3;
+    $('wzNext').textContent = step === 2 ? 'Connecter' : 'C\'est fait, étape suivante';
+    $('wzErr').textContent = '';
+    if (step === 3) wzState();
+    $('wizard').scrollTop = 0;
+  }
+  function wzClose() { wz.open = false; $('wizard').hidden = true; }
+  function wzState() {
+    const s = wz.last;
+    if (!s) return;
+    const V = {
+      connected: ['✅', 'C\'est prêt !', `Tu es connecté en tant que ${s.user}. Il ne reste plus qu'à ajouter l'overlay dans OBS.`],
+      auth: ['👀', 'Regarde Discord', 'Une fenêtre vient de s\'ouvrir dans Discord. Clique sur le bouton « Autoriser ». Si tu ne la vois pas, clique sur l\'icône Discord dans ta barre des tâches.'],
+      'no-discord': ['💤', 'Ouvre Discord', 'Lance l\'application Discord sur ce PC (pas la version navigateur). L\'overlay se connecte tout seul dès qu\'elle est ouverte.'],
+      error: ['⚠️', 'Ça n\'a pas marché', s.statusMsg],
+    }[s.status] || ['⏳', 'Connexion en cours…', 'Quelques secondes.'];
+    $('wzIcon').textContent = V[0];
+    $('wzTitle').textContent = V[1];
+    $('wzText').textContent = V[2];
+    $('wzFail').hidden = s.status !== 'error';
+    $('wzDone').hidden = s.status !== 'connected';
+  }
+  function wizardTick(s) {
+    wz.last = s;
+    if (!wz.seen) { wz.seen = true; if (s.status === 'setup') wzShow(0); }
+    if (wz.open && wz.step === 3) wzState();
+  }
+  $('wzBack').onclick = () => wzShow(wz.step - 1);
+  $('wzNext').onclick = async () => {
+    if (wz.step < 2) return wzShow(wz.step + 1);
+    const id = $('cid').value.trim(), secret = $('csecret').value.trim();
+    if (!/^\d{15,22}$/.test(id)) return ($('wzErr').textContent = 'Le Client ID est une suite de chiffres uniquement. Recopie-le avec le bouton « Copy » du site Discord.');
+    const r = await post('/api/config', { clientId: id, clientSecret: secret });
     const j = await r.json();
-    if (!r.ok) return ($('setupErr').textContent = j.error);
-    credOpen = false;
+    if (!r.ok) return ($('wzErr').textContent = j.error);
     $('csecret').value = '';
-    $('setup').hidden = true;
+    wzShow(3);
   };
+  for (const id of ['cid', 'csecret']) $(id).addEventListener('input', () => ($('wzErr').textContent = ''));
+  $('wzClose').onclick = wzClose;
+  $('wzFinish').onclick = wzClose;
+  $('wzFix').onclick = () => wzShow(2);
+  $('wzRetry').onclick = () => post('/api/retry');
+  $('credBtn').onclick = () => wzShow(0);
+  for (const b of document.querySelectorAll('[data-copy]')) b.onclick = async () => {
+    const text = b.dataset.copy || $('obsUrl').value;
+    try { await navigator.clipboard.writeText(text); } catch {}
+    const old = b.textContent;
+    b.textContent = 'Copié ✓';
+    setTimeout(() => (b.textContent = old), 1500);
+  };
+
   $('resetBtn').onclick = () => { settings = { ...defaults }; buildForm(); save(); };
   $('copyBtn').onclick = async () => {
     $('obsUrl').select();
@@ -385,8 +507,9 @@
     $('cid').value = s.clientId || '';
     $('autoRow').hidden = !s.canAutostart;
     $('autostart').checked = !!s.autostart;
-    if (!s.hasConfig) $('csecret').placeholder = '';
+    if (s.hasConfig) $('csecret').placeholder = 'Laisse vide pour garder le code actuel';
     $('obsUrl').value = `http://localhost:${s.port}/`;
+    document.querySelector('#wzDone code').textContent = $('obsUrl').value;
     buildForm();
   });
 </script>
