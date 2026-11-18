@@ -89,6 +89,12 @@
   .wz-actions { display: flex; gap: 10px; justify-content: center; margin: 14px 0 4px; }
   .wz-nav { display: flex; align-items: center; margin-top: 8px; }
   .wz-nav button { padding: 10px 18px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tabs button { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 500; padding: 6px 12px; }
+  .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .tabs button.add { color: var(--dim); border-style: dashed; }
+  .sub { display: block; margin: 12px 0 6px; }
+  #profDel.confirm { border-color: var(--bad); color: var(--bad); }
   [hidden] { display: none !important; }
   #updateBar { background: #2a2350; border-bottom: 1px solid var(--accent); padding: 9px 24px; font-size: 14px; }
   #updateBar a { font-weight: 700; margin-left: 8px; }
@@ -150,9 +156,15 @@
 <main>
   <div>
     <section>
-      <h2 data-t="obsTitle"></h2>
-      <div class="url"><input type="text" id="obsUrl" readonly><button id="copyBtn" data-copy="" data-t="copy"></button></div>
+      <h2 data-t="profTitle"></h2>
+      <p class="muted" style="margin-bottom:12px" data-t="profHelp"></p>
+      <div class="tabs" id="profTabs"></div>
+      <label class="sub" for="profName" data-t="profName"></label>
+      <input type="text" id="profName" maxlength="40" autocomplete="off">
+      <span class="sub" data-t="obsTitle"></span>
+      <div class="url"><input type="text" id="obsUrl" readonly aria-label="OBS"><button id="copyBtn" data-copy="" data-t="copy"></button></div>
       <div class="row"><small data-t="obsHelp"></small></div>
+      <div class="row" id="profDelRow"><span></span><button class="ghost" id="profDel" data-t="profDel"></button></div>
     </section>
 
     <section>
@@ -193,7 +205,7 @@
       <button class="ghost" data-bg="bg-light" data-t="bgLight"></button>
       <button class="ghost" data-bg="bg-green" data-t="bgGreen"></button>
     </div>
-    <div id="stage"><iframe src="/?preview" title="Preview"></iframe></div>
+    <div id="stage"><iframe src="about:blank" title="Preview"></iframe></div>
   </div>
 </main>
 <footer><span id="ver"></span> · <a href="/licences" target="_blank" data-t="licences"></a></footer>
@@ -251,7 +263,10 @@
         auth: 'Clique sur « Autoriser » dans la fenêtre Discord', demo: 'Mode démo (faux membres)', closed: 'L\'application est fermée : relance-la',
         connected: (u, ch, n) => `Connecté en tant que ${u}` + (ch ? ` · dans « ${ch} » (${n})` : ' · dans aucun vocal'),
       },
-      obsTitle: 'Lien pour OBS', obsHelp: 'Source → Navigateur, largeur 400 et hauteur 600 pour commencer. Les réglages s\'appliquent en direct, sans toucher à OBS.',
+      obsTitle: 'Lien OBS de ce profil', obsHelp: 'Source → Navigateur, largeur 400 et hauteur 600 pour commencer. Les réglages s\'appliquent en direct, sans toucher à OBS.',
+      profTitle: 'Profils d\'overlay', profHelp: 'Chaque profil a son propre style et son propre lien OBS. Mets-en un par scène (par exemple vertical en jeu, horizontal ailleurs) : ils marchent tous en même temps. Les réglages plus bas s\'appliquent au profil sélectionné.',
+      profName: 'Nom du profil', profNew: '＋ Nouveau profil', profDel: 'Supprimer ce profil', profDelConfirm: 'Clique encore pour supprimer',
+      newProfile: n => `Profil ${n}`,
       peopleTitle: 'Renommer les utilisateurs', peopleEmpty: 'Rejoins un salon vocal : les personnes présentes apparaîtront ici.',
       peopleHelp: 'Renomme, réordonne ou masque qui tu veux. Ces changements sont oubliés quand la personne quitte ton vocal.',
       peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
@@ -318,7 +333,10 @@
         auth: 'Click "Authorize" in the Discord window', demo: 'Demo mode (fake members)', closed: 'The app is closed: start it again',
         connected: (u, ch, n) => `Connected as ${u}` + (ch ? ` · in "${ch}" (${n})` : ' · not in a voice channel'),
       },
-      obsTitle: 'Link for OBS', obsHelp: 'Source → Browser, width 400 and height 600 to start. Settings apply live, no need to touch OBS.',
+      obsTitle: 'OBS link for this profile', obsHelp: 'Source → Browser, width 400 and height 600 to start. Settings apply live, no need to touch OBS.',
+      profTitle: 'Overlay profiles', profHelp: 'Each profile has its own style and its own OBS link. Use one per scene (for example vertical in game, horizontal elsewhere): they all work at the same time. The settings below apply to the selected profile.',
+      profName: 'Profile name', profNew: '＋ New profile', profDel: 'Delete this profile', profDelConfirm: 'Click again to delete',
+      newProfile: n => `Profile ${n}`,
       peopleTitle: 'Rename users', peopleEmpty: 'Join a voice channel: the people in it will show up here.',
       peopleHelp: 'Rename, reorder or hide anyone. These changes are forgotten when the person leaves your voice channel.',
       peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
@@ -385,15 +403,73 @@
 
   // ---------- Réglages ----------
   const SYSTEM_FONTS = ['Segoe UI', 'Arial', 'Verdana', 'Trebuchet MS', 'Georgia', 'Impact', 'Consolas', 'Comic Sans MS', 'Bahnschrift'];
-  let settings = {}, defaults = {}, saveTimer;
+  let settings = {}, defaults = {}, saveTimer, saveFlush = null;
+  let profiles = [], cur = null, port = 47474;
   let files = { builtinFonts: [], fonts: [] };
   const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   const loadFiles = async () => (files = await (await fetch('/api/files')).json());
   const upload = async (kind, file) => (await fetch(`/api/upload?kind=${kind}&name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })).json();
 
+  const curP = () => profiles.find(p => p.id === cur);
+  const profileUrl = id => `http://localhost:${port}/?profile=${encodeURIComponent(id)}`;
+
+  // ---------- Profils d'overlay ----------
+  function drawTabs() {
+    const box = $('profTabs');
+    box.textContent = '';
+    for (const p of profiles) {
+      const b = el('button', { className: p.id === cur ? 'on' : '', textContent: p.name });
+      b.onclick = () => selectProfile(p.id);
+      box.append(b);
+    }
+    const add = el('button', { className: 'add', textContent: S.profNew });
+    add.onclick = createProfile;
+    box.append(add);
+  }
+  function selectProfile(id) {
+    if (saveFlush) saveFlush();
+    cur = profiles.some(p => p.id === id) ? id : profiles[0].id;
+    try { localStorage.setItem('voProfile', cur); } catch {}
+    settings = curP().settings;
+    $('profName').value = curP().name;
+    $('obsUrl').value = profileUrl(cur);
+    document.querySelector('#stage iframe').src = `/?preview&profile=${encodeURIComponent(cur)}`;
+    $('profDelRow').hidden = profiles.length < 2;
+    resetDel();
+    drawTabs();
+    buildForm();
+  }
+  async function createProfile() {
+    if (saveFlush) saveFlush();
+    const j = await (await post('/api/profiles', { action: 'create', id: cur, name: S.newProfile(profiles.length + 1) })).json();
+    if (j.error) return alertMsg(j.error);
+    profiles = j.profiles;
+    selectProfile(j.profile.id);
+    $('profName').focus();
+    $('profName').select();
+  }
+  let delArmed = false, delTimer;
+  function resetDel() { delArmed = false; clearTimeout(delTimer); $('profDel').textContent = S.profDel; $('profDel').classList.remove('confirm'); }
+  async function deleteProfile() {
+    if (!delArmed) {
+      delArmed = true;
+      $('profDel').textContent = S.profDelConfirm;
+      $('profDel').classList.add('confirm');
+      delTimer = setTimeout(resetDel, 4000);
+      return;
+    }
+    const j = await (await post('/api/profiles', { action: 'delete', id: cur })).json();
+    if (j.error) return alertMsg(j.error);
+    profiles = j.profiles;
+    selectProfile(profiles[0].id);
+  }
+  function alertMsg(e) { $('importMsg').style.color = ''; $('importMsg').textContent = msg(e); }
+
   function save() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => post('/api/settings', settings), 120);
+    const body = { profile: cur, settings: { ...settings } };
+    saveFlush = () => { clearTimeout(saveTimer); saveFlush = null; post('/api/settings', body); };
+    saveTimer = setTimeout(saveFlush, 120);
   }
 
   function fillFonts(select, current) {
@@ -602,7 +678,7 @@
     $('wzRetry').onclick = () => post('/api/retry');
     $('credBtn').onclick = () => wzShow(0);
     for (const b of document.querySelectorAll('[data-copy]')) b.onclick = async () => {
-      const text = b.dataset.copy || $('obsUrl').value;
+      const text = b.dataset.copy || (b.id === 'copyBtn' ? $('obsUrl').value : $('wzUrl').textContent);
       try { await navigator.clipboard.writeText(text); } catch {}
       const old = b.textContent;
       b.textContent = S.copied;
@@ -617,17 +693,27 @@
       const j = await (await post('/api/autostart', { enabled: $('autostart').checked })).json();
       $('autostart').checked = !!j.autostart;
     };
-    $('resetBtn').onclick = () => { settings = { ...defaults, lang: settings.lang }; buildForm(); save(); };
+    $('resetBtn').onclick = () => { settings = curP().settings = { ...defaults }; buildForm(); save(); };
+
+    // Profils
+    $('profDel').onclick = deleteProfile;
+    let renameT;
+    $('profName').oninput = () => {
+      const name = $('profName').value;
+      if (name.trim()) { curP().name = name.trim(); drawTabs(); }
+      clearTimeout(renameT);
+      renameT = setTimeout(() => name.trim() && post('/api/profiles', { action: 'rename', id: cur, name }), 300);
+    };
+    $('profName').onblur = () => { if (!$('profName').value.trim()) $('profName').value = curP().name; };
 
     // Langue : on enregistre puis on recharge la page
     $('langSel').value = lang;
-    $('langSel').onchange = async () => { settings.lang = $('langSel').value; clearTimeout(saveTimer); await post('/api/settings', settings); location.reload(); };
+    $('langSel').onchange = async () => { if (saveFlush) saveFlush(); await post('/api/lang', { lang: $('langSel').value }); location.reload(); };
 
     // Export / import du style
     $('exportBtn').onclick = () => {
       const style = { ...settings };
-      delete style.lang;
-      const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify({ voiceOverlayStyle: 1, style }, null, 2)], { type: 'application/json' })), download: 'voice-overlay-style.json' });
+      const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify({ voiceOverlayStyle: 1, style }, null, 2)], { type: 'application/json' })), download: `voice-overlay-${cur}.json` });
       document.body.append(a);
       a.click();
       a.remove();
@@ -643,7 +729,7 @@
       $('importMsg').style.color = ok ? 'var(--ok)' : '';
       $('importMsg').textContent = ok ? S.importOk : S.importBad;
       if (!ok) return;
-      for (const k of Object.keys(defaults)) if (k !== 'lang' && k in data.style && typeof data.style[k] === typeof defaults[k]) settings[k] = data.style[k];
+      for (const k of Object.keys(defaults)) if (k in data.style && typeof data.style[k] === typeof defaults[k]) settings[k] = data.style[k];
       buildForm();
       save();
     };
@@ -652,9 +738,10 @@
   // ---------- Démarrage ----------
   (async () => {
     const [s] = await Promise.all([fetch('/api/state').then(r => r.json()), loadFiles()]);
-    settings = s.settings;
+    profiles = s.profiles;
     defaults = s.defaults;
-    lang = settings.lang === 'fr' || settings.lang === 'en' ? settings.lang : ((navigator.language || '').toLowerCase().startsWith('fr') ? 'fr' : 'en');
+    port = s.port;
+    lang = s.lang === 'fr' || s.lang === 'en' ? s.lang : ((navigator.language || '').toLowerCase().startsWith('fr') ? 'fr' : 'en');
     S = L[lang];
     document.documentElement.lang = lang;
     for (const e of document.querySelectorAll('[data-t]')) e.innerHTML = S[e.dataset.t];
@@ -666,11 +753,12 @@
     $('dataRow').hidden = !s.isExe;
     $('dataPath').textContent = s.dataDir;
     $('autostart').checked = !!s.autostart;
-    $('obsUrl').value = `http://localhost:${s.port}/`;
-    $('wzUrl').textContent = $('obsUrl').value;
+    $('wzUrl').textContent = profileUrl(profiles[0].id);
     $('ver').textContent = `${S.version} ${s.version}`;
     bind();
-    buildForm();
+    let last = null;
+    try { last = localStorage.getItem('voProfile'); } catch {}
+    selectProfile(last);
 
     const es = new EventSource('/events');
     es.onmessage = e => { const snap = JSON.parse(e.data); showStatus(snap); showPeople(snap); };

@@ -19,7 +19,7 @@
   body.right #wrap { align-items: flex-end; }
 
   #title { color: var(--text); background: var(--bg); margin-bottom: 4px; }
-  #title[hidden] { display: none; }
+  #title[hidden] { display: none !important; }
 
   #list { display: flex; flex-direction: column; align-items: flex-start; gap: var(--gap); }
   body.right #list { align-items: flex-end; }
@@ -130,6 +130,7 @@
   //   ?title  ?noTitle  ?hideSelf  ?speakingOnly  ?noName  ?size=48  ?align=right  ?layout=row
   const p = new URLSearchParams(location.search);
   const PREVIEW = p.has('preview');
+  const PROFILE = p.get('profile'); // ?profile=… : quel profil d'overlay afficher (sinon le premier)
 
   function withOverrides(s) {
     s = { ...s };
@@ -207,11 +208,11 @@
     last = snap;
     if (assetsV !== null && snap.assetsVersion !== assetsV) document.getElementById('fontcss').href = '/fonts.css?v=' + snap.assetsVersion;
     assetsV = snap.assetsVersion;
-    const s = withOverrides(snap.settings);
+    const s = withOverrides((snap.profiles && snap.profiles[PROFILE]) || snap.profiles[snap.defaultProfile]);
     applyStyle(s);
     const src = PREVIEW && !snap.channel ? fake : snap; // aperçu : vrai vocal si tu y es, sinon faux salon
 
-    const lang = langOf(s);
+    const lang = langOf(snap);
     const hint = PREVIEW ? '' : (snap.status === 'error' ? (snap.statusMsg || {})[lang] : HINTS[lang][snap.status]) || '';
     hintEl.hidden = !hint;
     hintEl.textContent = hint;

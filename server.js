@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const { exec, execFile, spawn } = require('child_process');
 
 const APP_NAME = 'VOICE OVERLAY - CAILLOU FEAT CLAUDE';
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 const REPO = 'CAILLOUUUU/voice-overlay';
 // Texte en deux langues : l'interface choisit, le journal utilise le français.
 const M = (fr, en) => ({ fr, en });
@@ -133,7 +133,6 @@ const BASE_URL = `http://localhost:${config.port}`;
 
 // ---------- Réglages de l'overlay (modifiables depuis /settings) ----------
 const DEFAULTS = {
-  lang: 'auto',          // auto | fr | en
   showDecorations: true,
   showTitle: true,
   titleText: '{salon}',
@@ -158,28 +157,55 @@ const DEFAULTS = {
   bold: true,
   customCss: '',
 };
-const settings = { ...DEFAULTS };
+// Plusieurs profils d'overlay, utilisables en même temps (un lien OBS par profil).
+// L'id d'un profil ne change jamais, même si on le renomme : le lien OBS reste valable.
+const store = { lang: 'auto', profiles: [] };   // profiles: [{ id, name, settings }]
+
+function cleanSettings(input, base = DEFAULTS) {
+  const out = { ...base };
+  if (!input || typeof input !== 'object') return out;
+  for (const k of Object.keys(DEFAULTS)) {
+    if (!(k in input)) continue;
+    const d = DEFAULTS[k];
+    const v = input[k];
+    if (typeof d === 'boolean') out[k] = !!v;
+    else if (typeof d === 'number') { const n = Number(v); if (Number.isFinite(n)) out[k] = n; }
+    else out[k] = String(v).slice(0, k === 'customCss' ? 20000 : 200);
+  }
+  return out;
+}
+const cleanName = n => String(n || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+function newProfileId(name) {
+  const base = cleanName(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'profil';
+  let id = base, i = 2;
+  while (store.profiles.some(p => p.id === id)) id = `${base}-${i++}`;
+  return id;
+}
+const getProfile = id => store.profiles.find(p => p.id === id);
+function saveStore() { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(store, null, 2)); }
+
+(function loadStore() {
+  const raw = readJson(SETTINGS_PATH) || {};
+  if (raw.lang === 'fr' || raw.lang === 'en') store.lang = raw.lang;
+  if (Array.isArray(raw.profiles)) {
+    for (const p of raw.profiles) {
+      if (!p || !/^[a-z0-9-]{1,30}$/.test(p.id) || getProfile(p.id)) continue;
+      store.profiles.push({ id: p.id, name: cleanName(p.name) || p.id, settings: cleanSettings(p.settings) });
+    }
+  }
+  // Version 1.0.x : un seul style, rangé à plat dans settings.json
+  if (!store.profiles.length) store.profiles.push({ id: 'principal', name: 'Principal', settings: cleanSettings(raw) });
+})();
 
 // Langue de l'interface : celle choisie, sinon celle du système.
 function uiLang() {
-  if (settings.lang === 'fr' || settings.lang === 'en') return settings.lang;
+  if (store.lang === 'fr' || store.lang === 'en') return store.lang;
   let loc = '';
   try { loc = Intl.DateTimeFormat().resolvedOptions().locale || ''; } catch {}
   return loc.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 }
 
-function applySettings(input) {
-  if (!input || typeof input !== 'object') return;
-  for (const k of Object.keys(DEFAULTS)) {
-    if (!(k in input)) continue;
-    const d = DEFAULTS[k];
-    const v = input[k];
-    if (typeof d === 'boolean') settings[k] = !!v;
-    else if (typeof d === 'number') { const n = Number(v); if (Number.isFinite(n)) settings[k] = n; }
-    else settings[k] = String(v).slice(0, k === 'customCss' ? 20000 : 200);
-  }
-}
-applySettings(readJson(SETTINGS_PATH));
 
 // ---------- État partagé ----------
 const state = {
@@ -210,7 +236,9 @@ function snapshot() {
     user: state.user,
     version: VERSION,
     update,
-    settings,
+    lang: store.lang,
+    profiles: Object.fromEntries(store.profiles.map(p => [p.id, p.settings])),
+    defaultProfile: store.profiles[0].id,
     assetsVersion,
     channel: state.channel,
     selfId: state.selfId,
@@ -389,7 +417,7 @@ async function handleApi(url, req, res) {
   const post = req.method === 'POST';
   if (url === '/api/state' && !post) {
     return sendJson(res, 200, {
-      app: APP_NAME, version: VERSION, settings, defaults: DEFAULTS, clientId: config.clientId, hasConfig: hasConfig(), port: config.port,
+      app: APP_NAME, version: VERSION, lang: store.lang, profiles: store.profiles, defaults: DEFAULTS, clientId: config.clientId, hasConfig: hasConfig(), port: config.port,
       canAutostart, autostart: canAutostart ? await getAutostart() : false, isExe: !!sea, dataDir: DIR,
     });
   }
@@ -420,11 +448,45 @@ async function handleApi(url, req, res) {
   const b = await readBody(req);
 
   switch (url) {
-    case '/api/settings':
-      applySettings(b);
-      fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
+    case '/api/settings': {
+      const p = getProfile(String(b.profile || ''));
+      if (!p) return sendJson(res, 404, { error: M('Profil introuvable.', 'Profile not found.') });
+      p.settings = cleanSettings(b.settings, p.settings);
+      saveStore();
       broadcast();
       return sendJson(res, 200, { ok: true });
+    }
+    case '/api/lang':
+      store.lang = ['fr', 'en'].includes(b.lang) ? b.lang : 'auto';
+      saveStore();
+      broadcast();
+      return sendJson(res, 200, { ok: true });
+
+    // --- Profils : créer (copie d'un profil), renommer, supprimer ---
+    case '/api/profiles': {
+      const p = getProfile(String(b.id || ''));
+      if (b.action === 'create') {
+        if (store.profiles.length >= 20) return sendJson(res, 400, { error: M('20 profils maximum.', '20 profiles maximum.') });
+        const name = cleanName(b.name) || `Profil ${store.profiles.length + 1}`;
+        const np = { id: newProfileId(name), name, settings: cleanSettings(p ? p.settings : {}) };
+        store.profiles.push(np);
+        saveStore();
+        broadcast();
+        return sendJson(res, 200, { ok: true, profile: np, profiles: store.profiles });
+      }
+      if (!p) return sendJson(res, 404, { error: M('Profil introuvable.', 'Profile not found.') });
+      if (b.action === 'rename') {
+        p.name = cleanName(b.name) || p.name;
+      } else if (b.action === 'delete') {
+        if (store.profiles.length === 1) return sendJson(res, 400, { error: M('Il faut garder au moins un profil.', 'You need to keep at least one profile.') });
+        store.profiles = store.profiles.filter(x => x !== p);
+      } else {
+        return sendJson(res, 400, { error: M('Action inconnue.', 'Unknown action.') });
+      }
+      saveStore();
+      broadcast();
+      return sendJson(res, 200, { ok: true, profiles: store.profiles });
+    }
 
     case '/api/config': {
       const id = String(b.clientId || '').trim();

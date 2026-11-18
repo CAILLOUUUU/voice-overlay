@@ -10,6 +10,7 @@ An OBS overlay that shows who is in **your** Discord voice channel, and follows 
 - Follows whatever voice channel you are in, and shows nothing when you are in none
 - Rename, reorder or hide people on the fly (forgotten when they leave)
 - Live settings page: layout, colors, 12 included fonts (or import your own), custom CSS
+- Several overlay profiles usable at the same time (for example vertical in game, horizontal elsewhere), each with its own OBS link
 - Export your style to a file and share it
 - English and French
 
@@ -27,9 +28,11 @@ The app then runs in the background with an icon next to the clock: left-click f
 
 ## In OBS
 
-Add a **Browser** source with the URL `http://localhost:47474/` (width 400, height 600 to start). The background is transparent.
+Add a **Browser** source with the profile's link, shown in the settings (for example `http://localhost:47474/?profile=principal`). Width 400, height 600 to start. The background is transparent.
 
-To use two sources with different looks, URL options override the settings:
+Each profile has its own link: create one per scene and add each link to its scene. They all work at the same time.
+
+For quick tweaks, URL options override the profile's settings:
 `?title` `?noTitle` `?hideSelf` `?speakingOnly` `?noName` `?size=48` `?align=right` `?layout=row`
 
 ## Privacy

@@ -10,6 +10,7 @@ Overlay OBS qui affiche les personnes présentes dans **ton** salon vocal Discor
 - Suit le vocal où tu te trouves, et n'affiche rien quand tu n'es dans aucun
 - Renommer, réordonner ou masquer des personnes à la volée (oublié quand elles partent)
 - Page de réglages en direct : disposition, couleurs, 12 polices fournies (ou importe la tienne), CSS personnalisé
+- Plusieurs profils d'overlay utilisables en même temps (par exemple vertical en jeu, horizontal ailleurs), chacun avec son lien OBS
 - Exporte ton style dans un fichier pour le partager
 - En français et en anglais
 
@@ -27,9 +28,11 @@ L'appli tourne ensuite en arrière-plan. Son icône est à côté de l'horloge :
 
 ## Dans OBS
 
-Ajoute une **Source → Navigateur** avec l'URL `http://localhost:47474/` (largeur 400, hauteur 600 pour commencer). Le fond est transparent.
+Ajoute une **Source → Navigateur** avec le lien du profil, affiché dans les réglages (par exemple `http://localhost:47474/?profile=principal`). Largeur 400, hauteur 600 pour commencer. Le fond est transparent.
 
-Pour avoir deux sources avec des styles différents, des options dans l'URL passent au-dessus des réglages :
+Chaque profil a son propre lien : crée-en un par scène et ajoute chaque lien dans la scène qui va avec. Ils fonctionnent tous en même temps.
+
+Pour des ajustements rapides, des options dans l'URL passent au-dessus des réglages du profil :
 `?title` `?noTitle` `?hideSelf` `?speakingOnly` `?noName` `?size=48` `?align=right` `?layout=row`
 
 ## Vie privée
