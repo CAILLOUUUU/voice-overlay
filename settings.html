@@ -175,6 +175,12 @@
         <p class="muted" style="margin:8px 0" data-t="peopleHelp"></p>
         <button class="ghost" id="peopleReset" data-t="peopleReset"></button>
       </div>
+      <div class="row"><span><label for="forgetSel" data-t="forgetLabel"></label><small data-t="forgetHelp"></small></span>
+        <select id="forgetSel">
+          <option value="0" data-t="forget0"></option><option value="2" data-t="forget2"></option>
+          <option value="10" data-t="forget10"></option><option value="60" data-t="forget60"></option>
+          <option value="-1" data-t="forgetNever"></option>
+        </select></div>
     </section>
 
     <div id="form"></div>
@@ -268,7 +274,9 @@
       profName: 'Nom du profil', profNew: '＋ Nouveau profil', profDel: 'Supprimer ce profil', profDelConfirm: 'Clique encore pour supprimer',
       newProfile: n => `Profil ${n}`,
       peopleTitle: 'Renommer les utilisateurs', peopleEmpty: 'Rejoins un salon vocal : les personnes présentes apparaîtront ici.',
-      peopleHelp: 'Renomme, réordonne ou masque qui tu veux. Ces changements sont oubliés quand la personne quitte ton vocal.',
+      peopleHelp: 'Renomme, réordonne ou masque qui tu veux. Tes changements restent même si Discord plante ou si quelqu\'un se reconnecte.',
+      forgetLabel: 'Oublier les changements d\'une personne partie depuis', forgetHelp: 'Si elle revient avant, elle retrouve son nom et sa place.',
+      forget0: 'Tout de suite', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 heure', forgetNever: 'Jamais',
       peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
       styleShare: 'Partager ton style', styleShareHelp: 'Enregistre ton style dans un fichier pour le garder ou l\'envoyer à quelqu\'un, ou charge celui d\'un autre.',
       exportBtn: 'Exporter mon style', importBtn: 'Importer un style', importOk: 'Style importé.', importBad: 'Ce fichier n\'est pas un style Voice Overlay.',
@@ -338,7 +346,9 @@
       profName: 'Profile name', profNew: '＋ New profile', profDel: 'Delete this profile', profDelConfirm: 'Click again to delete',
       newProfile: n => `Profile ${n}`,
       peopleTitle: 'Rename users', peopleEmpty: 'Join a voice channel: the people in it will show up here.',
-      peopleHelp: 'Rename, reorder or hide anyone. These changes are forgotten when the person leaves your voice channel.',
+      peopleHelp: 'Rename, reorder or hide anyone. Your changes stay even if Discord crashes or someone reconnects.',
+      forgetLabel: 'Forget a person\'s changes once they\'ve been gone for', forgetHelp: 'If they come back before that, they get their name and spot back.',
+      forget0: 'Right away', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 hour', forgetNever: 'Never',
       peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
       styleShare: 'Share your style', styleShareHelp: 'Save your style to a file to keep it or send it to someone, or load someone else\'s.',
       exportBtn: 'Export my style', importBtn: 'Import a style', importOk: 'Style imported.', importBad: 'This file is not a Voice Overlay style.',
@@ -687,6 +697,7 @@
     for (const b of document.querySelectorAll('[data-bg]')) b.onclick = () => ($('stage').className = b.dataset.bg);
 
     $('peopleReset').onclick = () => post('/api/people-reset');
+    $('forgetSel').onchange = () => post('/api/people-forget', { minutes: Number($('forgetSel').value) });
     $('dataBtn').onclick = () => post('/api/open-data');
     $('quitBtn').onclick = async () => { await post('/api/quit'); $('quitBtn').textContent = S.stopped; };
     $('autostart').onchange = async () => {
@@ -754,6 +765,7 @@
     $('dataPath').textContent = s.dataDir;
     $('autostart').checked = !!s.autostart;
     $('wzUrl').textContent = profileUrl(profiles[0].id);
+    $('forgetSel').value = String(s.forgetAfter);
     $('ver').textContent = `${S.version} ${s.version}`;
     bind();
     let last = null;

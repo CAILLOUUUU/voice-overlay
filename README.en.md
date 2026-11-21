@@ -8,7 +8,7 @@ An OBS overlay that shows who is in **your** Discord voice channel, and follows 
 
 - Shows who is speaking, muted or deafened, with Discord avatar decorations
 - Follows whatever voice channel you are in, and shows nothing when you are in none
-- Rename, reorder or hide people on the fly (forgotten when they leave)
+- Rename, reorder or hide people on the fly, without losing it all if Discord crashes
 - Live settings page: layout, colors, 12 included fonts (or import your own), custom CSS
 - Several overlay profiles usable at the same time (for example vertical in game, horizontal elsewhere), each with its own OBS link
 - Export your style to a file and share it

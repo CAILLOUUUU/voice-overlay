@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const { exec, execFile, spawn } = require('child_process');
 
 const APP_NAME = 'VOICE OVERLAY - CAILLOU FEAT CLAUDE';
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const REPO = 'CAILLOUUUU/voice-overlay';
 // Texte en deux langues : l'interface choisit, le journal utilise le français.
 const M = (fr, en) => ({ fr, en });
@@ -159,7 +159,9 @@ const DEFAULTS = {
 };
 // Plusieurs profils d'overlay, utilisables en même temps (un lien OBS par profil).
 // L'id d'un profil ne change jamais, même si on le renomme : le lien OBS reste valable.
-const store = { lang: 'auto', profiles: [] };   // profiles: [{ id, name, settings }]
+const store = { lang: 'auto', profiles: [], people: null };   // profiles: [{ id, name, settings }]
+// Délai avant d'oublier les renommages d'une personne partie (minutes ; -1 = jamais).
+const FORGET_CHOICES = [0, 2, 10, 60, -1];
 
 function cleanSettings(input, base = DEFAULTS) {
   const out = { ...base };
@@ -183,7 +185,22 @@ function newProfileId(name) {
   return id;
 }
 const getProfile = id => store.profiles.find(p => p.id === id);
-function saveStore() { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(store, null, 2)); }
+function saveStore() {
+  if (typeof state !== 'undefined') {
+    store.people = {
+      forgetAfter: store.people.forgetAfter,
+      custom: Object.fromEntries(state.custom),
+      order: state.order,
+      lastSeen: Object.fromEntries(state.lastSeen),
+    };
+  }
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(store, null, 2));
+}
+let peopleSaveTimer = null;
+function savePeopleSoon() {
+  clearTimeout(peopleSaveTimer);
+  peopleSaveTimer = setTimeout(() => { try { saveStore(); } catch {} }, 1000);
+}
 
 (function loadStore() {
   const raw = readJson(SETTINGS_PATH) || {};
@@ -196,6 +213,20 @@ function saveStore() { fs.writeFileSync(SETTINGS_PATH, JSON.stringify(store, nul
   }
   // Version 1.0.x : un seul style, rangé à plat dans settings.json
   if (!store.profiles.length) store.profiles.push({ id: 'principal', name: 'Principal', settings: cleanSettings(raw) });
+  // Renommages, ordre et masquages : gardés sur le disque pour survivre aux plantages de Discord ou de l'appli.
+  const pp = raw.people && typeof raw.people === 'object' ? raw.people : {};
+  const custom = {};
+  for (const [id, c] of Object.entries(pp.custom || {})) {
+    if (!/^\d{5,25}$/.test(id) || !c || typeof c !== 'object') continue;
+    const name = String(c.name || '').trim().slice(0, 40);
+    if (name || c.hidden) custom[id] = { name, hidden: !!c.hidden };
+  }
+  store.people = {
+    forgetAfter: FORGET_CHOICES.includes(pp.forgetAfter) ? pp.forgetAfter : 10,
+    custom,
+    order: Array.isArray(pp.order) ? pp.order.map(String).filter(id => /^\d{5,25}$/.test(id)).slice(0, 200) : [],
+    lastSeen: Object.fromEntries(Object.entries(pp.lastSeen || {}).filter(([id, t]) => /^\d{5,25}$/.test(id) && Number.isFinite(t))),
+  };
 })();
 
 // Langue de l'interface : celle choisie, sinon celle du système.
@@ -216,9 +247,10 @@ const state = {
   selfId: null,
   members: new Map(),      // id -> { id, name, avatar, mute, deaf }   (ordre d'arrivée)
   speaking: new Set(),
-  // Réglages par personne : valables tant que la personne est dans ton vocal.
-  custom: new Map(),       // id -> { name?, hidden? }
-  order: [],               // ordre personnalisé (ids)
+  // Réglages par personne : gardés tant que la personne n'est pas partie depuis plus de « forgetAfter » minutes.
+  custom: new Map(Object.entries(store.people.custom)),   // id -> { name?, hidden? }
+  order: [...store.people.order],                         // ordre personnalisé (ids)
+  lastSeen: new Map(Object.entries(store.people.lastSeen)), // id -> dernière fois vu dans ton vocal (ms)
 };
 
 function orderedMembers() {
@@ -249,11 +281,29 @@ function snapshot() {
   };
 }
 
-// Oublie les réglages des personnes qui ne sont plus dans le vocal.
+// Oublie les réglages des personnes parties depuis plus de « forgetAfter » minutes.
+// Une coupure de Discord (chez toi ou chez quelqu'un du vocal) ne fait donc plus tout perdre.
 function prunePeople() {
-  for (const id of state.custom.keys()) if (!state.members.has(id)) state.custom.delete(id);
-  state.order = state.order.filter(id => state.members.has(id));
+  const now = Date.now();
+  const tracked = new Set([...state.custom.keys(), ...state.order]);
+  for (const id of tracked) {
+    if (state.members.has(id)) state.lastSeen.set(id, now);
+    else if (!state.lastSeen.has(id)) state.lastSeen.set(id, now);
+  }
+  for (const id of state.lastSeen.keys()) if (!tracked.has(id)) state.lastSeen.delete(id);
+  // Pendant une coupure avec Discord, on ne sait pas qui est là : on n'efface rien.
+  const live = state.status === 'connected' || state.status === 'demo';
+  const limit = store.people.forgetAfter;
+  if (!live || limit < 0) return savePeopleSoon();
+  for (const id of tracked) {
+    if (state.members.has(id) || now - state.lastSeen.get(id) < limit * 60000) continue;
+    state.custom.delete(id);
+    state.lastSeen.delete(id);
+  }
+  state.order = state.order.filter(id => state.custom.has(id) || state.members.has(id) || state.lastSeen.has(id));
+  savePeopleSoon();
 }
+setInterval(() => { const n = state.custom.size + state.order.length; prunePeople(); if (state.custom.size + state.order.length !== n) broadcast(); }, 20000);
 
 function resetState() {
   state.channel = null;
@@ -417,7 +467,7 @@ async function handleApi(url, req, res) {
   const post = req.method === 'POST';
   if (url === '/api/state' && !post) {
     return sendJson(res, 200, {
-      app: APP_NAME, version: VERSION, lang: store.lang, profiles: store.profiles, defaults: DEFAULTS, clientId: config.clientId, hasConfig: hasConfig(), port: config.port,
+      app: APP_NAME, version: VERSION, lang: store.lang, profiles: store.profiles, forgetAfter: store.people.forgetAfter, defaults: DEFAULTS, clientId: config.clientId, hasConfig: hasConfig(), port: config.port,
       canAutostart, autostart: canAutostart ? await getAutostart() : false, isExe: !!sea, dataDir: DIR,
     });
   }
@@ -456,6 +506,12 @@ async function handleApi(url, req, res) {
       broadcast();
       return sendJson(res, 200, { ok: true });
     }
+    case '/api/people-forget':
+      store.people.forgetAfter = FORGET_CHOICES.includes(Number(b.minutes)) ? Number(b.minutes) : 10;
+      prunePeople();
+      saveStore();
+      broadcast();
+      return sendJson(res, 200, { ok: true });
     case '/api/lang':
       store.lang = ['fr', 'en'].includes(b.lang) ? b.lang : 'auto';
       saveStore();
@@ -510,16 +566,25 @@ async function handleApi(url, req, res) {
       if ('name' in b) c.name = String(b.name || '').trim().slice(0, 40);
       if ('hidden' in b) c.hidden = !!b.hidden;
       if (c.name || c.hidden) state.custom.set(id, c); else state.custom.delete(id);
+      state.lastSeen.set(id, Date.now());
+      savePeopleSoon();
       broadcast();
       return sendJson(res, 200, { ok: true });
     }
     case '/api/order':
-      state.order = (Array.isArray(b.order) ? b.order : []).map(String).filter(id => state.members.has(id));
+    {
+      // Les personnes absentes gardent leur place, derrière celles qui sont là.
+      const present = (Array.isArray(b.order) ? b.order : []).map(String).filter(id => state.members.has(id));
+      state.order = [...present, ...state.order.filter(id => !present.includes(id) && !state.members.has(id))];
+      savePeopleSoon();
       broadcast();
+    }
       return sendJson(res, 200, { ok: true });
     case '/api/people-reset':
       state.custom.clear();
       state.order = [];
+      state.lastSeen.clear();
+      savePeopleSoon();
       broadcast();
       return sendJson(res, 200, { ok: true });
 
