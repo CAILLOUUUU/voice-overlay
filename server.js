@@ -196,6 +196,7 @@ function saveStore() {
       custom: Object.fromEntries(state.custom),
       order: state.order,
       lastSeen: Object.fromEntries(state.lastSeen),
+      links: Object.fromEntries(dpm.links),
     };
   }
   fs.writeFileSync(SETTINGS_PATH, JSON.stringify(store, null, 2));
@@ -231,6 +232,9 @@ function savePeopleSoon() {
     custom,
     order: Array.isArray(pp.order) ? pp.order.map(String).filter(id => /^\d{5,25}$/.test(id)).slice(0, 200) : [],
     lastSeen: Object.fromEntries(Object.entries(pp.lastSeen || {}).filter(([id, t]) => /^\d{5,25}$/.test(id) && Number.isFinite(t))),
+    // Liens Discord ↔ Riot appris pendant les lobbies DPM : gardés pour toujours.
+    links: Object.fromEntries(Object.entries(pp.links || {}).filter(([id, l]) => /^\d{5,25}$/.test(id) && l && typeof l.name === 'string')
+      .map(([id, l]) => [id, { name: l.name.slice(0, 40), tag: String(l.tag || '').slice(0, 10) }])),
   };
 })();
 
@@ -259,7 +263,7 @@ const state = {
 };
 
 // Rôle d'une personne : celui choisi à la main, sinon celui trouvé dans le client League.
-const roleOf = id => (state.custom.get(id) || {}).role || league.roles.get(id) || '';
+const roleOf = id => (state.custom.get(id) || {}).role || dpmRole(id) || league.roles.get(id) || '';
 
 // Ordre : d'abord les rôles (Top → Support), puis les autres selon l'ordre personnalisé.
 function orderedMembers() {
@@ -290,10 +294,12 @@ function snapshot() {
       const c = state.custom.get(m.id) || {};
       return {
         ...m, realName: m.name, name: c.name || m.name, hidden: !!c.hidden, speaking: state.speaking.has(m.id),
-        role: roleOf(m.id), manualRole: c.role || '', autoRole: league.roles.get(m.id) || '',
+        role: roleOf(m.id), manualRole: c.role || '', autoRole: dpmRole(m.id) || league.roles.get(m.id) || '',
+        riot: dpm.links.get(m.id) || null, side: dpmSide(m.id),
       };
     }),
     league: { status: league.status },
+    dpm: dpmStatus(),
   };
 }
 
@@ -440,6 +446,11 @@ function isLocalRequest(req) {
   if (!ok.includes(req.headers.host)) return false;
   const o = req.headers.origin;
   return !o || ok.some(h => o === `http://${h}`);
+}
+// L'extension Chrome (pont DPM) n'a le droit d'appeler que /api/dpm.
+function isExtensionRequest(req) {
+  const ok = [`localhost:${config.port}`, `127.0.0.1:${config.port}`];
+  return ok.includes(req.headers.host) && /^chrome-extension:\/\/[a-p]{32}$/.test(req.headers.origin || '');
 }
 
 function readRaw(req, max) {
@@ -597,6 +608,12 @@ async function handleApi(url, req, res) {
       broadcast();
     }
       return sendJson(res, 200, { ok: true });
+    case '/api/dpm-forget':
+      if (b.id) dpm.links.delete(String(b.id)); else dpm.links.clear();
+      dpmCorrelate();
+      savePeopleSoon();
+      broadcast();
+      return sendJson(res, 200, { ok: true });
     case '/api/people-reset':
       state.custom.clear();
       state.order = [];
@@ -665,6 +682,9 @@ http.createServer((req, res) => {
     });
   }
 
+  if (url === '/api/dpm' && req.method === 'POST' && (isExtensionRequest(req) || isLocalRequest(req))) {
+    return readBody(req).then(b => { dpmUpdate(b); sendJson(res, 200, { ok: true }); }).catch(e => sendJson(res, 400, { error: e.message }));
+  }
   if (url.startsWith('/api/')) {
     if (!isLocalRequest(req)) return sendJson(res, 403, { error: 'interdit' });
     return handleApi(url, req, res).catch(e => sendJson(res, 400, { error: e.message }));
@@ -1058,6 +1078,138 @@ async function leagueTick() {
 }
 if ((WIN || process.env.VO_LEAGUE) && !DEMO) setInterval(leagueTick, 3000);
 
+// ---------- Pont DPM (inhouse.dpm.lol) ----------
+// L'extension Chrome « Voice Overlay – pont DPM » envoie le lobby tel que ta page DPM le reçoit :
+// pour chaque joueur, son Riot ID, son équipe, son rôle et « dans le vocal : oui/non ».
+// DPM ne donne pas les comptes Discord : on les retrouve en associant chaque arrivée dans le vocal
+// Discord à la pastille qui passe au vert au même moment. Chaque lien trouvé est gardé pour toujours.
+const dpm = {
+  links: new Map(Object.entries(store.people.links || {})), // id Discord -> { name, tag }
+  lobby: null,          // { matchId, state, players: [{ key, name, tag, side, lane, inVoice }], at }
+  greens: [],           // pastilles passées au vert pendant ce lobby : [{ key, t }]
+  joins: [],            // arrivées dans le vocal pendant ce lobby : [{ id, t }]
+  lastExtension: 0,
+};
+const riotKey = (name, tag) => `${String(name).toLowerCase()}#${String(tag).toLowerCase()}`;
+const DPM_LANES = { top: 'top', jungle: 'jungle', mid: 'mid', middle: 'mid', adc: 'adc', bottom: 'adc', bot: 'adc', support: 'support', utility: 'support' };
+const LOBBY_MAX_AGE = 3 * 3600 * 1000;
+
+function dpmPlayerOf(id) {
+  const l = dpm.links.get(id);
+  if (!l || !dpm.lobby || Date.now() - dpm.lobby.at > LOBBY_MAX_AGE) return null;
+  return dpm.lobby.players.find(p => p.key === riotKey(l.name, l.tag)) || null;
+}
+const dpmRole = id => { const p = dpmPlayerOf(id); return p ? p.lane : ''; };
+const dpmSide = id => { const p = dpmPlayerOf(id); return p ? p.side : ''; };
+function dpmStatus() {
+  const lobby = dpm.lobby && Date.now() - dpm.lobby.at < LOBBY_MAX_AGE ? dpm.lobby : null;
+  const linkedHere = lobby ? lobby.players.filter(p => [...dpm.links.values()].some(l => riotKey(l.name, l.tag) === p.key)).length : 0;
+  return {
+    extension: Date.now() - dpm.lastExtension < 10 * 60 * 1000,
+    lobby: lobby ? { state: lobby.state, players: lobby.players.length, inVoice: lobby.players.filter(p => p.inVoice).length, linked: linkedHere } : null,
+    links: dpm.links.size,
+  };
+}
+
+function dpmUpdate(b) {
+  if (!b || typeof b !== 'object' || !Array.isArray(b.players)) return;
+  dpm.lastExtension = Date.now();
+  const now = Date.now();
+  const players = b.players.slice(0, 20).map(p => ({
+    name: String(p.gameName || '').slice(0, 40), tag: String(p.tagLine || '').slice(0, 10),
+    side: p.side === 'red' ? 'red' : p.side === 'blue' ? 'blue' : '',
+    lane: DPM_LANES[String(p.lane || p.chosenRole || '').toLowerCase()] || '',
+    inVoice: !!p.inVoice,
+  })).filter(p => p.name).map(p => ({ ...p, key: riotKey(p.name, p.tag) }));
+  const matchId = String(b.matchId || '').slice(0, 64);
+  const isNew = !dpm.lobby || dpm.lobby.matchId !== matchId;
+  if (isNew) { dpm.greens = []; dpm.joins = []; }
+  const before = new Map(isNew ? [] : dpm.lobby.players.map(p => [p.key, p.inVoice]));
+  for (const p of players) {
+    // Pastille qui passe au vert (seulement les changements vus en direct, pas l'état de départ)
+    if (!isNew && p.inVoice && before.get(p.key) === false) dpm.greens.push({ key: p.key, t: now });
+  }
+  dpm.lobby = { matchId, state: String(b.state || '').slice(0, 30), players, at: now };
+  if (isNew) console.log(`Lobby DPM : ${players.length} joueurs (${players.filter(p => p.inVoice).length} dans le vocal).`);
+  dpmCorrelate();
+  broadcast();
+}
+
+function dpmJoin(id) {
+  if (!dpm.lobby || Date.now() - dpm.lobby.at > 15 * 60 * 1000) return;
+  dpm.joins.push({ id, t: Date.now() });
+  setTimeout(() => { dpmCorrelate(); broadcast(); }, 50);
+}
+
+function dpmLink(id, p, how) {
+  // Un joueur League ne va qu'avec une seule personne Discord.
+  for (const [other, l] of dpm.links) if (other !== id && riotKey(l.name, l.tag) === p.key) dpm.links.delete(other);
+  dpm.links.set(id, { name: p.name, tag: p.tag });
+  const m = state.members.get(id);
+  console.log(`Lien DPM (${how}) : ${m ? m.name : id} ↔ ${p.name}#${p.tag}`);
+  savePeopleSoon();
+}
+
+// Associe les personnes du vocal aux joueurs du lobby.
+function dpmCorrelate() {
+  const lobby = dpm.lobby;
+  if (!lobby) return;
+  const linkedKeys = () => new Set([...dpm.links.values()].map(l => riotKey(l.name, l.tag)));
+  const isLinkedId = id => dpm.links.has(id) && lobby.players.some(p => p.key === riotKey(dpm.links.get(id).name, dpm.links.get(id).tag));
+  const free = () => {
+    const keys = linkedKeys();
+    return {
+      joins: dpm.joins.filter(j => !isLinkedId(j.id) && state.members.has(j.id)),
+      greens: dpm.greens.filter(g => !keys.has(g.key)),
+    };
+  };
+  const WINDOW = 20000, CLOSE = 1500;
+  // 1. Par ordre d'arrivée : 1re arrivée Discord libre = 1re pastille verte libre, si c'est sans ambiguïté.
+  for (let guard = 0; guard < 20; guard++) {
+    const { joins, greens } = free();
+    if (!joins.length || !greens.length) break;
+    const j = joins[0], g = greens[0];
+    if (Math.abs(g.t - j.t) > WINDOW) {
+      // Trop éloignés : on écarte le plus ancien des deux, qui n'a pas de partenaire.
+      if (j.t < g.t) dpm.joins = dpm.joins.filter(x => x !== j); else dpm.greens = dpm.greens.filter(x => x !== g);
+      continue;
+    }
+    const nearJ = joins.filter(x => Math.abs(x.t - j.t) <= CLOSE);
+    const nearG = greens.filter(x => Math.abs(x.t - g.t) <= CLOSE);
+    if (nearJ.length === 1 && nearG.length === 1) {
+      dpmLink(j.id, lobby.players.find(p => p.key === g.key), 'arrivée');
+      continue;
+    }
+    // Arrivées presque simultanées : on départage par la ressemblance des pseudos, sinon on attend.
+    let solved = false;
+    for (const x of nearJ) {
+      const m = state.members.get(x.id);
+      const scored = nearG.map(y => ({ y, s: similarity(m ? m.name : '', lobby.players.find(p => p.key === y.key).name) })).sort((a, b) => b.s - a.s);
+      if (scored.length && scored[0].s >= 0.6 && (scored.length === 1 || scored[0].s - scored[1].s >= 0.2)) {
+        dpmLink(x.id, lobby.players.find(p => p.key === scored[0].y.key), 'arrivée + pseudo');
+        solved = true;
+        break;
+      }
+    }
+    if (!solved) break;
+  }
+  // 2. Par élimination : un seul joueur vert non relié et une seule personne du vocal non reliée.
+  const keys = linkedKeys();
+  const greenUnlinked = lobby.players.filter(p => p.inVoice && !keys.has(p.key));
+  const voiceUnlinked = [...state.members.keys()].filter(id => !isLinkedId(id) && id !== '__');
+  if (greenUnlinked.length === 1 && voiceUnlinked.length === 1 && lobby.players.filter(p => p.inVoice).length === state.members.size) {
+    dpmLink(voiceUnlinked[0], greenUnlinked[0], 'élimination');
+  }
+  // 3. Pseudos qui se ressemblent nettement.
+  for (const id of state.members.keys()) {
+    if (isLinkedId(id)) continue;
+    const m = state.members.get(id);
+    const ks = linkedKeys();
+    const scored = lobby.players.filter(p => !ks.has(p.key)).map(p => ({ p, s: similarity(m.name, p.name) })).sort((a, b) => b.s - a.s);
+    if (scored.length && scored[0].s >= 0.85 && (scored.length === 1 || scored[0].s - scored[1].s >= 0.15)) dpmLink(id, scored[0].p, 'pseudo');
+  }
+}
+
 // ---------- Suivi du salon vocal ----------
 const CHANNEL_EVENTS = ['VOICE_STATE_CREATE', 'VOICE_STATE_UPDATE', 'VOICE_STATE_DELETE', 'SPEAKING_START', 'SPEAKING_STOP'];
 let rpc = null;
@@ -1111,6 +1263,7 @@ function onEvent(evt, data) {
     case 'VOICE_STATE_CREATE':
     case 'VOICE_STATE_UPDATE': {
       const m = toMember(data, state.channel && state.channel.guildId);
+      if (!state.members.has(m.id)) dpmJoin(m.id);
       state.members.set(m.id, m);
       broadcast();
       break;

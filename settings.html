@@ -59,6 +59,9 @@
   .person.off input[type=text] { opacity: .45; text-decoration: line-through; }
   .person input[type=text] { flex: 1; }
   .person button { padding: 4px 9px; }
+  .person { flex-wrap: wrap; }
+  .person .riot { flex-basis: 100%; padding-left: 38px; color: var(--dim); font-size: 12px; margin-top: -2px; }
+  .person .riot button { padding: 0 6px; font-size: 11px; margin-left: 6px; }
   .person .rolesel { width: 104px; flex: none; padding: 6px 4px; }
   .person input[type=text] { min-width: 90px; }
   .person button:disabled { opacity: .3; cursor: default; }
@@ -176,7 +179,8 @@
       <div id="people"></div>
       <div id="peopleFoot" hidden>
         <p class="muted" style="margin:8px 0" data-t="peopleHelp"></p>
-        <button class="ghost" id="peopleReset" data-t="peopleReset"></button>
+        <div class="btnrow"><button class="ghost" id="peopleReset" data-t="peopleReset"></button>
+        <button class="ghost" id="linksReset"></button></div>
       </div>
       <div class="row"><span><label for="forgetSel" data-t="forgetLabel"></label><small data-t="forgetHelp"></small></span>
         <select id="forgetSel">
@@ -282,6 +286,9 @@
       forget0: 'Tout de suite', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 heure', forgetNever: 'Jamais',
       roleAuto: r => r ? `Auto · ${r}` : 'Auto', roleNames: { top: 'Top', jungle: 'Jungle', mid: 'Mid', adc: 'ADC', support: 'Support' },
       leagueOff: 'Client League fermé : choisis les rôles à la main, ou ouvre League pour les détecter.',
+      dpmLobby: (v, n, l) => `Lobby DPM reçu : ${v}/${n} dans le vocal, ${l} relié(s) à Discord.`,
+      dpmWaiting: 'Pont DPM actif : en attente d\'un lobby.',
+      linksReset: n => `Oublier les liens Discord ↔ League (${n})`, unlink: 'oublier',
       leagueOn: 'Client League détecté : les rôles se remplissent seuls quand le pseudo League ressemble au pseudo Discord.',
       leagueGame: 'Partie League en cours : rôles lus depuis le jeu.',
       peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
@@ -358,6 +365,9 @@
       forget0: 'Right away', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 hour', forgetNever: 'Never',
       roleAuto: r => r ? `Auto · ${r}` : 'Auto', roleNames: { top: 'Top', jungle: 'Jungle', mid: 'Mid', adc: 'ADC', support: 'Support' },
       leagueOff: 'League client closed: pick roles by hand, or open League to detect them.',
+      dpmLobby: (v, n, l) => `DPM lobby received: ${v}/${n} in voice, ${l} linked to Discord.`,
+      dpmWaiting: 'DPM bridge active: waiting for a lobby.',
+      linksReset: n => `Forget Discord ↔ League links (${n})`, unlink: 'forget',
       leagueOn: 'League client detected: roles fill in by themselves when the League name looks like the Discord name.',
       leagueGame: 'League game in progress: roles read from the game.',
       peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
@@ -605,7 +615,11 @@
   function showPeople(s) {
     const ms = s.members;
     const ls = (s.league || {}).status;
-    $('leagueInfo').textContent = ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff;
+    const d = s.dpm || {};
+    $('leagueInfo').textContent = d.lobby ? S.dpmLobby(d.lobby.inVoice, d.lobby.players, d.lobby.linked)
+      : (d.extension ? S.dpmWaiting + ' ' : '') + (ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff);
+    $('linksReset').textContent = S.linksReset(d.links || 0);
+    $('linksReset').hidden = !d.links;
     $('peopleEmpty').hidden = ms.length > 0;
     $('peopleFoot').hidden = ms.length === 0;
     const key = ms.map(m => m.id).join(',');
@@ -632,8 +646,9 @@
         const role = el('select', { className: 'rolesel', title: S.showRoles });
         role.append(el('option', { value: '' }), ...Object.entries(S.roleNames).map(([v, t]) => el('option', { value: v, textContent: t })));
         role.onchange = () => post('/api/person', { id: m.id, role: role.value });
-        const row = el('div', { className: 'person' }, img, name, role, up, down, el('label', {}, hide, S.hide));
-        rows.set(m.id, { row, img, name, hide, role, up, down });
+        const riot = el('small', { className: 'riot' });
+        const row = el('div', { className: 'person' }, img, name, role, up, down, el('label', {}, hide, S.hide), riot);
+        rows.set(m.id, { row, img, name, hide, role, up, down, riot });
         $('people').append(row);
       });
       if (focused && rows.has(focused)) rows.get(focused).name.focus();
@@ -645,6 +660,17 @@
       const custom = m.name !== m.realName ? m.name : '';
       if (document.activeElement !== r.name && r.name.value !== custom) r.name.value = custom;
       r.hide.checked = m.hidden;
+      const riotTxt = m.riot ? `↔ ${m.riot.name}#${m.riot.tag}` + (m.side ? ` · ${m.side === 'blue' ? '🔵' : '🔴'}` : '') : '';
+      if (r.riot.dataset.v !== riotTxt) {
+        r.riot.dataset.v = riotTxt;
+        r.riot.textContent = riotTxt;
+        if (riotTxt) {
+          const x = el('button', { className: 'ghost', textContent: S.unlink });
+          x.onclick = () => post('/api/dpm-forget', { id: m.id });
+          r.riot.append(x);
+        }
+      }
+      r.riot.hidden = !riotTxt;
       r.role.options[0].textContent = S.roleAuto(m.autoRole ? ({ top: 'TOP', jungle: 'JGL', mid: 'MID', adc: 'ADC', support: 'SUP' })[m.autoRole] : '');
       if (document.activeElement !== r.role) r.role.value = m.manualRole;
       // Les personnes avec un rôle sont triées automatiquement : les flèches ne servent que pour les autres.
@@ -719,6 +745,7 @@
     for (const b of document.querySelectorAll('[data-bg]')) b.onclick = () => ($('stage').className = b.dataset.bg);
 
     $('peopleReset').onclick = () => post('/api/people-reset');
+    $('linksReset').onclick = () => post('/api/dpm-forget', {});
     $('forgetSel').onchange = () => post('/api/people-forget', { minutes: Number($('forgetSel').value) });
     $('dataBtn').onclick = () => post('/api/open-data');
     $('quitBtn').onclick = async () => { await post('/api/quit'); $('quitBtn').textContent = S.stopped; };
