@@ -19,7 +19,7 @@ Overlay OBS qui affiche les personnes présentes dans **ton** salon vocal Discor
 
 ## Installation (Windows)
 
-1. Télécharge `Voice-Overlay-CAILLOU-FEAT-CLAUDE.exe` depuis la page Releases et mets-le où tu veux (Téléchargements, Bureau…). Il ne crée aucun fichier à côté de lui.
+1. Télécharge `Voice-Overlay-<version>.exe` (par exemple `Voice-Overlay-1.2.0.exe`) depuis la page Releases et mets-le où tu veux (Téléchargements, Bureau…). Il ne crée aucun fichier à côté de lui.
 2. Ouvre Discord **desktop** (pas la version navigateur), puis lance le `.exe`.
    - Windows peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**. C'est normal pour une appli non signée.
 3. Un assistant s'ouvre dans ton navigateur et te guide en 4 étapes pour relier l'overlay à Discord.

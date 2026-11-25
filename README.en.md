@@ -19,7 +19,7 @@ An OBS overlay that shows who is in **your** Discord voice channel, and follows 
 
 ## Install (Windows)
 
-1. Download `Voice-Overlay-CAILLOU-FEAT-CLAUDE.exe` from the Releases page and put it wherever you like (Downloads, Desktop…). It creates no files next to itself.
+1. Download `Voice-Overlay-<version>.exe` (for example `Voice-Overlay-1.2.0.exe`) from the Releases page and put it wherever you like (Downloads, Desktop…). It creates no files next to itself.
 2. Open the Discord **desktop** app, then run the `.exe`.
    - Windows may show "Windows protected your PC": click **More info**, then **Run anyway**. This is expected for an unsigned app.
 3. A setup assistant opens in your browser and guides you through 4 steps to link the overlay to Discord.
