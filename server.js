@@ -608,12 +608,18 @@ async function handleApi(url, req, res) {
       broadcast();
     }
       return sendJson(res, 200, { ok: true });
-    case '/api/dpm-forget':
-      if (b.id) dpm.links.delete(String(b.id)); else dpm.links.clear();
-      dpmCorrelate();
+    case '/api/dpm-forget': {
+      // Les liens oubliés ne sont pas recréés automatiquement avant le prochain lobby.
+      const ids = b.id ? [String(b.id)] : [...dpm.links.keys()];
+      for (const id of ids) {
+        const l = dpm.links.get(id);
+        if (l) dpm.blocked.add(blockKey(id, riotKey(l.name, l.tag)));
+        dpm.links.delete(id);
+      }
       savePeopleSoon();
       broadcast();
       return sendJson(res, 200, { ok: true });
+    }
     case '/api/people-reset':
       state.custom.clear();
       state.order = [];
@@ -984,7 +990,7 @@ async function readLeague() {
       const me = await localGet(lock.port, '/lol-summoner/v1/current-summoner', lock.password);
       if (me && me.gameName) league.self = { name: me.gameName, tag: me.tagLine || '' };
     }
-    if (league.self && state.selfId && !dpm.links.has(state.selfId)) {
+    if (league.self && state.selfId && !dpm.links.has(state.selfId) && !dpm.blocked.has(blockKey(state.selfId, riotKey(league.self.name, league.self.tag)))) {
       dpm.links.set(state.selfId, { ...league.self });
       console.log(`Lien (client League) : toi ↔ ${league.self.name}#${league.self.tag}`);
       savePeopleSoon();
@@ -1099,7 +1105,9 @@ const dpm = {
   greens: [],           // pastilles passées au vert pendant ce lobby : [{ key, t }]
   joins: [],            // arrivées dans le vocal pendant ce lobby : [{ id, t }]
   lastExtension: 0,
+  blocked: new Set(),   // liens oubliés à la main : « idDiscord|riotKey », pas recréés avant le prochain lobby
 };
+const blockKey = (id, key) => `${id}|${key}`;
 const riotKey = (name, tag) => `${String(name).toLowerCase()}#${String(tag).toLowerCase()}`;
 const DPM_LANES = { top: 'top', jungle: 'jungle', mid: 'mid', middle: 'mid', adc: 'adc', bottom: 'adc', bot: 'adc', support: 'support', utility: 'support' };
 const LOBBY_MAX_AGE = 3 * 3600 * 1000;
@@ -1145,7 +1153,7 @@ function dpmUpdate(b) {
   })).filter(p => p.name).map(p => ({ ...p, key: riotKey(p.name, p.tag) }));
   const matchId = String(b.matchId || '').slice(0, 64);
   const isNew = !dpm.lobby || dpm.lobby.matchId !== matchId;
-  if (isNew) { dpm.greens = []; dpm.joins = []; }
+  if (isNew) { dpm.greens = []; dpm.joins = []; dpm.blocked.clear(); }
   const before = new Map(isNew ? [] : dpm.lobby.players.map(p => [p.key, p.inVoice]));
   for (const p of players) {
     // Pastille qui passe au vert (seulement les changements vus en direct, pas l'état de départ)
@@ -1165,12 +1173,14 @@ function dpmJoin(id) {
 }
 
 function dpmLink(id, p, how) {
+  if (dpm.blocked.has(blockKey(id, p.key))) return false;
   // Un joueur League ne va qu'avec une seule personne Discord.
   for (const [other, l] of dpm.links) if (other !== id && riotKey(l.name, l.tag) === p.key) dpm.links.delete(other);
   dpm.links.set(id, { name: p.name, tag: p.tag });
   const m = state.members.get(id);
   console.log(`Lien DPM (${how}) : ${m ? m.name : id} ↔ ${p.name}#${p.tag}`);
   savePeopleSoon();
+  return true;
 }
 
 // Associe les personnes du vocal aux joueurs du lobby. On recommence tant qu'on trouve de nouveaux liens :
@@ -1208,7 +1218,8 @@ function dpmCorrelateOnce() {
     const nearJ = joins.filter(x => Math.abs(x.t - j.t) <= CLOSE);
     const nearG = greens.filter(x => Math.abs(x.t - g.t) <= CLOSE);
     if (nearJ.length === 1 && nearG.length === 1) {
-      dpmLink(j.id, lobby.players.find(p => p.key === g.key), 'arrivée');
+      // Lien oublié à la main : cette arrivée ne compte plus.
+      if (!dpmLink(j.id, lobby.players.find(p => p.key === g.key), 'arrivée')) dpm.joins = dpm.joins.filter(x => x !== j);
       continue;
     }
     // Arrivées presque simultanées : on départage par la ressemblance des pseudos, sinon on attend.
@@ -1216,8 +1227,8 @@ function dpmCorrelateOnce() {
     for (const x of nearJ) {
       const m = state.members.get(x.id);
       const scored = nearG.map(y => ({ y, s: similarity(m ? m.name : '', lobby.players.find(p => p.key === y.key).name) })).sort((a, b) => b.s - a.s);
-      if (scored.length && scored[0].s >= 0.6 && (scored.length === 1 || scored[0].s - scored[1].s >= 0.2)) {
-        dpmLink(x.id, lobby.players.find(p => p.key === scored[0].y.key), 'arrivée + pseudo');
+      if (scored.length && scored[0].s >= 0.6 && (scored.length === 1 || scored[0].s - scored[1].s >= 0.2)
+        && dpmLink(x.id, lobby.players.find(p => p.key === scored[0].y.key), 'arrivée + pseudo')) {
         solved = true;
         break;
       }
@@ -1238,7 +1249,7 @@ function dpmCorrelateOnce() {
     if (isLinkedId(id)) continue;
     const m = state.members.get(id);
     const ks = linkedKeys();
-    const scored = lobby.players.filter(p => !ks.has(p.key)).map(p => ({ p, s: similarity(m.name, p.name) })).sort((a, b) => b.s - a.s);
+    const scored = lobby.players.filter(p => !ks.has(p.key) && !dpm.blocked.has(blockKey(id, p.key))).map(p => ({ p, s: similarity(m.name, p.name) })).sort((a, b) => b.s - a.s);
     if (scored.length && scored[0].s >= 0.85 && (scored.length === 1 || scored[0].s - scored[1].s >= 0.15)) dpmLink(id, scored[0].p, 'pseudo');
   }
 }
