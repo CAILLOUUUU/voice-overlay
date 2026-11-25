@@ -985,7 +985,31 @@ async function readLeague() {
 
 // Ressemblance entre un pseudo Discord et un pseudo League.
 const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Mots trop courants dans les pseudos pour servir à reconnaître quelqu'un.
+const COMMON_WORDS = new Set(['the', 'les', 'des', 'and', 'lol', 'euw', 'ttv', 'twitch', 'top', 'mid', 'adc', 'sup', 'jgl', 'bot', 'pro', 'xxx', 'officiel', 'official']);
+// Découpe un pseudo en morceaux : espaces, ponctuation, chiffres et majuscules séparent les mots.
+function tokens(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([a-zA-Z])(\d)|(\d)([a-zA-Z])/g, '$1$3 $2$4')
+    .toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w) && !COMMON_WORDS.has(w));
+}
+// Un mot du pseudo Discord identique à un mot du pseudo League (« Bally77 » ↔ « Bally Bagayoko »).
+function tokenScore(a, b) {
+  const ta = tokens(a), tb = tokens(b);
+  let best = 0;
+  for (const x of ta) {
+    for (const y of tb) {
+      if (x === y) best = Math.max(best, x.length >= 4 ? 0.85 : 0.8);
+      else if (Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x))) best = Math.max(best, 0.78);
+    }
+  }
+  return best;
+}
+const noDigits = s => norm(s).replace(/[0-9]/g, '');
 function similarity(a, b) {
+  return Math.max(rawSimilarity(a, b), rawSimilarity(noDigits(a), noDigits(b)), tokenScore(a, b));
+}
+function rawSimilarity(a, b) {
   a = norm(a); b = norm(b);
   if (!a || !b) return 0;
   if (a === b) return 1;
