@@ -97,6 +97,10 @@
   .tabs button.add { color: var(--dim); border-style: dashed; }
   .sub { display: block; margin: 12px 0 6px; }
   #profDel.confirm { border-color: var(--bad); color: var(--bad); }
+  .wz .choice { display: block; width: 100%; text-align: left; padding: 14px 16px; margin: 10px 0; border-radius: 10px; font-weight: 400; }
+  .wz .choice b { display: block; font-size: 16px; margin-bottom: 3px; }
+  .wz .choice span { font-size: 13.5px; opacity: .85; }
+  .wz .choice.ghost { border: 1px solid var(--line); }
   [hidden] { display: none !important; }
   #updateBar { background: #2a2350; border-bottom: 1px solid var(--accent); padding: 9px 24px; font-size: 14px; }
   #updateBar a { font-weight: 700; margin-left: 8px; }
@@ -126,7 +130,12 @@
     </div>
     <div class="wz-dots" id="wzDots"></div>
 
-    <div class="wz-step" data-t="wz1"></div>
+    <div class="wz-step">
+      <h3 data-t="wz0Title"></h3>
+      <button class="choice" id="wzQuick"><b data-t="wzQuickT"></b><span data-t="wzQuickD"></span></button>
+      <button class="choice ghost" id="wzOwn"><b data-t="wzOwnT"></b><span data-t="wzOwnD"></span></button>
+    </div>
+    <div class="wz-step" data-t="wz1" hidden></div>
     <div class="wz-step" data-t="wz2" hidden></div>
     <div class="wz-step" hidden>
       <h3 data-t="wz3Title"></h3>
@@ -232,10 +241,13 @@
   const L = {
     fr: {
       credBtn: 'Identifiants Discord', resetBtn: 'Réinitialiser le style', download: 'Télécharger', copy: 'Copier', copied: 'Copié ✓',
-      back: 'Retour', retry: 'Réessayer', fixCodes: 'Corriger mes codes', quit: 'Quitter', stopped: 'Arrêté',
+      back: 'Retour', retry: 'Réessayer', fixCodes: 'Modifier la connexion', quit: 'Quitter', stopped: 'Arrêté',
       updateText: v => `La version ${v} est disponible.`,
-      wzHead: 'On relie l\'overlay à ton Discord', wzSub: '4 étapes, environ 2 minutes. À faire une seule fois.',
+      wzHead: 'On relie l\'overlay à ton Discord', wzSub: 'À faire une seule fois.',
       wzNext: 'C\'est fait, étape suivante', wzConnect: 'Connecter',
+      wz0Title: 'Comment veux-tu te connecter ?',
+      wzQuickT: 'Connexion rapide', wzQuickD: 'Un seul clic sur « Autoriser » dans Discord. Pour les potes de Caillou : il doit t\'avoir ajouté comme testeur de son appli.',
+      wzOwnT: 'Créer ma propre clé', wzOwnD: 'Pour tout le monde. 3 petites étapes sur le site Discord, environ 2 minutes.',
       wz1: `<h3>Étape 1 · Crée ta clé Discord</h3>
         <p>Discord demande que chaque utilisateur ait sa propre « application ». C'est gratuit, ça ne publie rien, et personne d'autre ne la voit.</p>
         <ol><li>Clique sur le bouton violet ci-dessous. Le site développeur de Discord s'ouvre (connecte-toi si on te le demande).</li>
@@ -308,10 +320,13 @@
     },
     en: {
       credBtn: 'Discord credentials', resetBtn: 'Reset style', download: 'Download', copy: 'Copy', copied: 'Copied ✓',
-      back: 'Back', retry: 'Try again', fixCodes: 'Fix my codes', quit: 'Quit', stopped: 'Stopped',
+      back: 'Back', retry: 'Try again', fixCodes: 'Change connection', quit: 'Quit', stopped: 'Stopped',
       updateText: v => `Version ${v} is available.`,
-      wzHead: 'Let\'s link the overlay to your Discord', wzSub: '4 steps, about 2 minutes. You only do this once.',
+      wzHead: 'Let\'s link the overlay to your Discord', wzSub: 'You only do this once.',
       wzNext: 'Done, next step', wzConnect: 'Connect',
+      wz0Title: 'How do you want to connect?',
+      wzQuickT: 'Quick connect', wzQuickD: 'Just one click on "Authorize" in Discord. For Caillou\'s friends: he must have added you as a tester of his app.',
+      wzOwnT: 'Create my own key', wzOwnD: 'For everyone. 3 short steps on the Discord site, about 2 minutes.',
       wz1: `<h3>Step 1 · Create your Discord key</h3>
         <p>Discord requires each user to have their own "application". It's free, nothing gets published, and nobody else can see it.</p>
         <ol><li>Click the purple button below. The Discord developer site opens (log in if asked).</li>
@@ -663,13 +678,15 @@
     wz.step = step;
     $('wizard').hidden = false;
     panels.forEach((p, i) => (p.hidden = i !== step));
+    // Étape 0 : choix ; 1 à 3 : créer sa propre clé ; 4 : connexion en cours / résultat
     $('wzDots').textContent = '';
-    for (let i = 0; i < 4; i++) $('wzDots').append(el('i', { className: i < step ? 'done' : i === step ? 'on' : '' }));
-    $('wzBack').hidden = step === 0 || step === 3;
-    $('wzNext').hidden = step === 3;
-    $('wzNext').textContent = step === 2 ? S.wzConnect : S.wzNext;
+    $('wzDots').hidden = step === 0 || (step === 4 && wz.quick);
+    for (let i = 1; i <= 4; i++) $('wzDots').append(el('i', { className: i < step ? 'done' : i === step ? 'on' : '' }));
+    $('wzBack').hidden = step === 0 || step === 4;
+    $('wzNext').hidden = step === 0 || step === 4;
+    $('wzNext').textContent = step === 3 ? S.wzConnect : S.wzNext;
     $('wzErr').textContent = '';
-    if (step === 3) wzState();
+    if (step === 4) wzState();
     $('wizard').scrollTop = 0;
   }
   function wzClose() { wz.open = false; $('wizard').hidden = true; }
@@ -688,25 +705,33 @@
   function wizardTick(s) {
     wz.last = s;
     if (!wz.seen) { wz.seen = true; if (s.status === 'setup') wzShow(0); }
-    if (wz.open && wz.step === 3) wzState();
+    if (wz.open && wz.step === 4) wzState();
   }
 
   function bind() {
     $('wzBack').onclick = () => wzShow(wz.step - 1);
     $('wzNext').onclick = async () => {
-      if (wz.step < 2) return wzShow(wz.step + 1);
+      if (wz.step < 3) return wzShow(wz.step + 1);
       const id = $('cid').value.trim(), secret = $('csecret').value.trim();
       if (!/^\d{15,22}$/.test(id)) return ($('wzErr').textContent = S.badId);
       const r = await post('/api/config', { clientId: id, clientSecret: secret });
       const j = await r.json();
       if (!r.ok) return ($('wzErr').textContent = msg(j.error));
       $('csecret').value = '';
-      wzShow(3);
+      wz.quick = false;
+      wzShow(4);
     };
+    $('wzQuick').onclick = async () => {
+      const j = await (await post('/api/config', { shared: true })).json();
+      if (j.error) return ($('wzErr').textContent = msg(j.error));
+      wz.quick = true;
+      wzShow(4);
+    };
+    $('wzOwn').onclick = () => { wz.quick = false; wzShow(1); };
     for (const id of ['cid', 'csecret']) $(id).addEventListener('input', () => ($('wzErr').textContent = ''));
     $('wzClose').onclick = wzClose;
     $('wzFinish').onclick = wzClose;
-    $('wzFix').onclick = () => wzShow(2);
+    $('wzFix').onclick = () => wzShow(wz.quick ? 0 : 3);
     $('wzRetry').onclick = () => post('/api/retry');
     $('credBtn').onclick = () => wzShow(0);
     for (const b of document.querySelectorAll('[data-copy]')) b.onclick = async () => {

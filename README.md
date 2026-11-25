@@ -22,7 +22,7 @@ Overlay OBS qui affiche les personnes présentes dans **ton** salon vocal Discor
 1. Télécharge `Voice-Overlay-CAILLOU-FEAT-CLAUDE.exe` depuis la page Releases et mets-le où tu veux (Téléchargements, Bureau…). Il ne crée aucun fichier à côté de lui.
 2. Ouvre Discord **desktop** (pas la version navigateur), puis lance le `.exe`.
    - Windows peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires**, puis **Exécuter quand même**. C'est normal pour une appli non signée.
-3. Un assistant s'ouvre dans ton navigateur et te guide en 4 étapes pour relier l'overlay à Discord.
+3. Un assistant s'ouvre dans ton navigateur. Choisis « Créer ma propre clé » : il te guide en 3 étapes pour relier l'overlay à Discord. (« Connexion rapide » est réservée aux testeurs de l'appli Discord de Caillou.)
 4. À la fin, Discord ouvre une fenêtre : clique sur **Autoriser**.
 
 L'appli tourne ensuite en arrière-plan. Son icône est à côté de l'horloge : clic gauche pour les réglages, clic droit pour quitter.
