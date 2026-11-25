@@ -5,6 +5,7 @@
   const send = data => window.postMessage({ source: 'voice-overlay-dpm', lobby: data }, location.origin);
   const pick = j => j && Array.isArray(j.players) ? {
     matchId: j.matchId, state: j.state,
+    you: j.you && (j.you.side === 'blue' || j.you.side === 'red') ? { side: j.you.side } : null,
     players: j.players.map(p => ({ gameName: p.gameName, tagLine: p.tagLine, side: p.side, lane: p.lane, chosenRole: p.chosenRole, inVoice: p.inVoice })),
   } : null;
   const origFetch = window.fetch;

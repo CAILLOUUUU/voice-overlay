@@ -1121,8 +1121,10 @@ function dpmStatus() {
   };
 }
 
-// Équipe du vocal suivi : d'après son nom (« Red », « Blue », « Rouge », « Bleu »), sinon d'après les personnes déjà reliées.
+// Équipe du vocal suivi : ton équipe d'après DPM (« Côté rouge / bleu »), sinon le nom du salon,
+// sinon les personnes déjà reliées.
 function dpmVoiceSide() {
+  if (dpm.lobby && dpm.lobby.youSide) return dpm.lobby.youSide;
   const name = String((state.channel && state.channel.name) || '').toLowerCase();
   if (/\b(red|rouge)\b/.test(name)) return 'red';
   if (/\b(blue|bleu)\b/.test(name)) return 'blue';
@@ -1149,7 +1151,8 @@ function dpmUpdate(b) {
     // Pastille qui passe au vert (seulement les changements vus en direct, pas l'état de départ)
     if (!isNew && p.inVoice && before.get(p.key) === false) dpm.greens.push({ key: p.key, t: now });
   }
-  dpm.lobby = { matchId, state: String(b.state || '').slice(0, 30), players, at: now };
+  const youSide = b.you && (b.you.side === 'blue' || b.you.side === 'red') ? b.you.side : '';
+  dpm.lobby = { matchId, state: String(b.state || '').slice(0, 30), players, youSide, at: now };
   if (isNew) console.log(`Lobby DPM : ${players.length} joueurs (${players.filter(p => p.inVoice).length} dans le vocal).`);
   dpmCorrelate();
   broadcast();

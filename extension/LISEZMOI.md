@@ -20,7 +20,7 @@ Il suffit d'envoyer le lobby à l'appli :
 POST http://127.0.0.1:47474/api/dpm
 Content-Type: application/json
 
-{ "matchId": "...", "state": "gathering",
+{ "matchId": "...", "state": "gathering", "you": { "side": "red" },
   "players": [ { "gameName": "...", "tagLine": "...", "side": "blue|red", "lane": "top|jungle|mid|adc|support", "inVoice": true } ] }
 ```
 
