@@ -979,6 +979,16 @@ async function readLeague() {
       localGet(lock.port, '/lol-champ-select/v1/session', lock.password),
     ]);
     league.status = lobby || session ? 'on' : 'off';
+    // Ton propre Riot ID : te relie directement à ton compte Discord.
+    if (!league.self && league.status === 'on') {
+      const me = await localGet(lock.port, '/lol-summoner/v1/current-summoner', lock.password);
+      if (me && me.gameName) league.self = { name: me.gameName, tag: me.tagLine || '' };
+    }
+    if (league.self && state.selfId && !dpm.links.has(state.selfId)) {
+      dpm.links.set(state.selfId, { ...league.self });
+      console.log(`Lien (client League) : toi ↔ ${league.self.name}#${league.self.tag}`);
+      savePeopleSoon();
+    }
     if (lobby) { raw.lobby = lobby; collectPlayers(lobby, players); }
     if (session) { raw.champSelect = session; collectPlayers(session, players); }
     // Noms manquants : on les demande au client à partir du puuid.
@@ -1111,6 +1121,16 @@ function dpmStatus() {
   };
 }
 
+// Équipe du vocal suivi : d'après son nom (« Red », « Blue », « Rouge », « Bleu »), sinon d'après les personnes déjà reliées.
+function dpmVoiceSide() {
+  const name = String((state.channel && state.channel.name) || '').toLowerCase();
+  if (/\b(red|rouge)\b/.test(name)) return 'red';
+  if (/\b(blue|bleu)\b/.test(name)) return 'blue';
+  const sides = [...state.members.keys()].map(dpmSide).filter(Boolean);
+  if (sides.length && sides.every(s => s === sides[0])) return sides[0];
+  return '';
+}
+
 function dpmUpdate(b) {
   if (!b || typeof b !== 'object' || !Array.isArray(b.players)) return;
   dpm.lastExtension = Date.now();
@@ -1150,8 +1170,16 @@ function dpmLink(id, p, how) {
   savePeopleSoon();
 }
 
-// Associe les personnes du vocal aux joueurs du lobby.
+// Associe les personnes du vocal aux joueurs du lobby. On recommence tant qu'on trouve de nouveaux liens :
+// un lien trouvé par pseudo peut en débloquer un autre par élimination.
 function dpmCorrelate() {
+  for (let pass = 0; pass < 6; pass++) {
+    const before = dpm.links.size + [...dpm.links.values()].map(l => l.name).join();
+    dpmCorrelateOnce();
+    if (dpm.links.size + [...dpm.links.values()].map(l => l.name).join() === before) break;
+  }
+}
+function dpmCorrelateOnce() {
   const lobby = dpm.lobby;
   if (!lobby) return;
   const linkedKeys = () => new Set([...dpm.links.values()].map(l => riotKey(l.name, l.tag)));
@@ -1193,11 +1221,13 @@ function dpmCorrelate() {
     }
     if (!solved) break;
   }
-  // 2. Par élimination : un seul joueur vert non relié et une seule personne du vocal non reliée.
+  // 2. Par élimination : chaque équipe a son vocal. On ne compte que les joueurs de l'équipe de ce vocal.
+  const side = dpmVoiceSide();
   const keys = linkedKeys();
-  const greenUnlinked = lobby.players.filter(p => p.inVoice && !keys.has(p.key));
-  const voiceUnlinked = [...state.members.keys()].filter(id => !isLinkedId(id) && id !== '__');
-  if (greenUnlinked.length === 1 && voiceUnlinked.length === 1 && lobby.players.filter(p => p.inVoice).length === state.members.size) {
+  const pool = lobby.players.filter(p => p.inVoice && (!side || p.side === side));
+  const greenUnlinked = pool.filter(p => !keys.has(p.key));
+  const voiceUnlinked = [...state.members.keys()].filter(id => !isLinkedId(id));
+  if (greenUnlinked.length === 1 && voiceUnlinked.length === 1 && pool.length === state.members.size) {
     dpmLink(voiceUnlinked[0], greenUnlinked[0], 'élimination');
   }
   // 3. Pseudos qui se ressemblent nettement.
