@@ -59,6 +59,8 @@
   .person.off input[type=text] { opacity: .45; text-decoration: line-through; }
   .person input[type=text] { flex: 1; }
   .person button { padding: 4px 9px; }
+  .person .rolesel { width: 104px; flex: none; padding: 6px 4px; }
+  .person input[type=text] { min-width: 90px; }
   .person button:disabled { opacity: .3; cursor: default; }
   .person label { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; white-space: nowrap; }
   .muted { color: var(--dim); font-size: 13px; margin: 0; }
@@ -170,6 +172,7 @@
     <section>
       <h2 data-t="peopleTitle"></h2>
       <p class="muted" id="peopleEmpty" data-t="peopleEmpty"></p>
+      <p class="muted" id="leagueInfo" style="margin-bottom:10px"></p>
       <div id="people"></div>
       <div id="peopleFoot" hidden>
         <p class="muted" style="margin:8px 0" data-t="peopleHelp"></p>
@@ -277,6 +280,10 @@
       peopleHelp: 'Renomme, réordonne ou masque qui tu veux. Tes changements restent même si Discord plante ou si quelqu\'un se reconnecte.',
       forgetLabel: 'Oublier les changements d\'une personne partie depuis', forgetHelp: 'Si elle revient avant, elle retrouve son nom et sa place.',
       forget0: 'Tout de suite', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 heure', forgetNever: 'Jamais',
+      roleAuto: r => r ? `Auto · ${r}` : 'Auto', roleNames: { top: 'Top', jungle: 'Jungle', mid: 'Mid', adc: 'ADC', support: 'Support' },
+      leagueOff: 'Client League fermé : choisis les rôles à la main, ou ouvre League pour les détecter.',
+      leagueOn: 'Client League détecté : les rôles se remplissent seuls quand le pseudo League ressemble au pseudo Discord.',
+      leagueGame: 'Partie League en cours : rôles lus depuis le jeu.',
       peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
       styleShare: 'Partager ton style', styleShareHelp: 'Enregistre ton style dans un fichier pour le garder ou l\'envoyer à quelqu\'un, ou charge celui d\'un autre.',
       exportBtn: 'Exporter mon style', importBtn: 'Importer un style', importOk: 'Style importé.', importBad: 'Ce fichier n\'est pas un style Voice Overlay.',
@@ -290,7 +297,7 @@
       titleHelp: '{salon} = nom du vocal, {nb} = nombre de personnes. Exemple : « INHOUSE · {salon} ({nb}) », ou un texte fixe.',
       layout: 'Sens', column: 'Liste verticale', row: 'En ligne (horizontal)', align: 'Alignement', left: 'À gauche', right: 'À droite',
       size: 'Taille des avatars', gap: 'Espacement', shape: 'Forme des avatars', circle: 'Rond', rounded: 'Carré arrondi', square: 'Carré',
-      showNames: 'Afficher les pseudos', showIcons: 'Icônes micro coupé / sourd', showDecorations: 'Décorations d\'avatar Discord',
+      showNames: 'Afficher les pseudos', showIcons: 'Icônes micro coupé / sourd', showDecorations: 'Décorations d\'avatar Discord', showRoles: 'Rôles League of Legends',
       hideSelf: 'Me cacher de la liste', speakingOnly: 'Seulement ceux qui parlent', dimSilent: 'Estomper ceux qui ne parlent pas',
       effect: 'Effet quand quelqu\'un parle', ring: 'Contour', glow: 'Halo lumineux', bounce: 'Rebond',
       speakColor: 'Couleur « parle »', accentColor: 'Couleur d\'accent (point du titre)', textColor: 'Couleur du texte', bgColor: 'Couleur de fond',
@@ -349,6 +356,10 @@
       peopleHelp: 'Rename, reorder or hide anyone. Your changes stay even if Discord crashes or someone reconnects.',
       forgetLabel: 'Forget a person\'s changes once they\'ve been gone for', forgetHelp: 'If they come back before that, they get their name and spot back.',
       forget0: 'Right away', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 hour', forgetNever: 'Never',
+      roleAuto: r => r ? `Auto · ${r}` : 'Auto', roleNames: { top: 'Top', jungle: 'Jungle', mid: 'Mid', adc: 'ADC', support: 'Support' },
+      leagueOff: 'League client closed: pick roles by hand, or open League to detect them.',
+      leagueOn: 'League client detected: roles fill in by themselves when the League name looks like the Discord name.',
+      leagueGame: 'League game in progress: roles read from the game.',
       peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
       styleShare: 'Share your style', styleShareHelp: 'Save your style to a file to keep it or send it to someone, or load someone else\'s.',
       exportBtn: 'Export my style', importBtn: 'Import a style', importOk: 'Style imported.', importBad: 'This file is not a Voice Overlay style.',
@@ -362,7 +373,7 @@
       titleHelp: '{salon} = voice channel name, {nb} = number of people. Example: "INHOUSE · {salon} ({nb})", or any fixed text.',
       layout: 'Direction', column: 'Vertical list', row: 'In a row (horizontal)', align: 'Alignment', left: 'Left', right: 'Right',
       size: 'Avatar size', gap: 'Spacing', shape: 'Avatar shape', circle: 'Round', rounded: 'Rounded square', square: 'Square',
-      showNames: 'Show names', showIcons: 'Muted / deafened icons', showDecorations: 'Discord avatar decorations',
+      showNames: 'Show names', showIcons: 'Muted / deafened icons', showDecorations: 'Discord avatar decorations', showRoles: 'League of Legends roles',
       hideSelf: 'Hide me from the list', speakingOnly: 'Only people speaking', dimSilent: 'Dim people who aren\'t speaking',
       effect: 'Effect when someone speaks', ring: 'Outline', glow: 'Glow', bounce: 'Bounce',
       speakColor: 'Speaking color', accentColor: 'Accent color (title dot)', textColor: 'Text color', bgColor: 'Background color',
@@ -391,6 +402,7 @@
       { k: 'showNames', t: 'bool', label: S.showNames },
       { k: 'showIcons', t: 'bool', label: S.showIcons },
       { k: 'showDecorations', t: 'bool', label: S.showDecorations },
+      { k: 'showRoles', t: 'bool', label: S.showRoles },
       { k: 'hideSelf', t: 'bool', label: S.hideSelf },
       { k: 'speakingOnly', t: 'bool', label: S.speakingOnly },
       { k: 'dimSilent', t: 'bool', label: S.dimSilent },
@@ -592,6 +604,8 @@
   const rows = new Map();
   function showPeople(s) {
     const ms = s.members;
+    const ls = (s.league || {}).status;
+    $('leagueInfo').textContent = ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff;
     $('peopleEmpty').hidden = ms.length > 0;
     $('peopleFoot').hidden = ms.length === 0;
     const key = ms.map(m => m.id).join(',');
@@ -615,22 +629,30 @@
         down.onclick = () => move(1);
         const hide = el('input', { type: 'checkbox' });
         hide.onchange = () => post('/api/person', { id: m.id, hidden: hide.checked });
-        const row = el('div', { className: 'person' }, img, name, up, down, el('label', {}, hide, S.hide));
-        rows.set(m.id, { row, img, name, hide });
+        const role = el('select', { className: 'rolesel', title: S.showRoles });
+        role.append(el('option', { value: '' }), ...Object.entries(S.roleNames).map(([v, t]) => el('option', { value: v, textContent: t })));
+        role.onchange = () => post('/api/person', { id: m.id, role: role.value });
+        const row = el('div', { className: 'person' }, img, name, role, up, down, el('label', {}, hide, S.hide));
+        rows.set(m.id, { row, img, name, hide, role, up, down });
         $('people').append(row);
       });
       if (focused && rows.has(focused)) rows.get(focused).name.focus();
     }
-    for (const m of ms) {
+    ms.forEach((m, idx) => {
       const r = rows.get(m.id);
       if (r.img.getAttribute('src') !== m.avatar) r.img.src = m.avatar;
       r.name.placeholder = m.realName;
       const custom = m.name !== m.realName ? m.name : '';
       if (document.activeElement !== r.name && r.name.value !== custom) r.name.value = custom;
       r.hide.checked = m.hidden;
+      r.role.options[0].textContent = S.roleAuto(m.autoRole ? ({ top: 'TOP', jungle: 'JGL', mid: 'MID', adc: 'ADC', support: 'SUP' })[m.autoRole] : '');
+      if (document.activeElement !== r.role) r.role.value = m.manualRole;
+      // Les personnes avec un rôle sont triées automatiquement : les flèches ne servent que pour les autres.
+      r.up.disabled = !!m.role || idx === 0 || !!ms[idx - 1].role;
+      r.down.disabled = !!m.role || idx === ms.length - 1;
       r.row.classList.toggle('off', m.hidden);
       r.row.classList.toggle('speaking', m.speaking);
-    }
+    });
   }
 
   // ---------- Assistant de première utilisation ----------

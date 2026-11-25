@@ -13,10 +13,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const https = require('https');
 const { exec, execFile, spawn } = require('child_process');
 
 const APP_NAME = 'VOICE OVERLAY - CAILLOU FEAT CLAUDE';
-const VERSION = '1.1.1';
+const VERSION = '1.2.0';
 const REPO = 'CAILLOUUUU/voice-overlay';
 // Texte en deux langues : l'interface choisit, le journal utilise le français.
 const M = (fr, en) => ({ fr, en });
@@ -134,6 +135,7 @@ const BASE_URL = `http://localhost:${config.port}`;
 // ---------- Réglages de l'overlay (modifiables depuis /settings) ----------
 const DEFAULTS = {
   showDecorations: true,
+  showRoles: true,
   showTitle: true,
   titleText: '{salon}',
   layout: 'column',      // column | row
@@ -162,6 +164,8 @@ const DEFAULTS = {
 const store = { lang: 'auto', profiles: [], people: null };   // profiles: [{ id, name, settings }]
 // Délai avant d'oublier les renommages d'une personne partie (minutes ; -1 = jamais).
 const FORGET_CHOICES = [0, 2, 10, 60, -1];
+// Rôles League of Legends, dans l'ordre d'affichage.
+const ROLES = ['top', 'jungle', 'mid', 'adc', 'support'];
 
 function cleanSettings(input, base = DEFAULTS) {
   const out = { ...base };
@@ -219,7 +223,8 @@ function savePeopleSoon() {
   for (const [id, c] of Object.entries(pp.custom || {})) {
     if (!/^\d{5,25}$/.test(id) || !c || typeof c !== 'object') continue;
     const name = String(c.name || '').trim().slice(0, 40);
-    if (name || c.hidden) custom[id] = { name, hidden: !!c.hidden };
+    const role = ROLES.includes(c.role) ? c.role : '';
+    if (name || c.hidden || role) custom[id] = { name, hidden: !!c.hidden, role };
   }
   store.people = {
     forgetAfter: FORGET_CHOICES.includes(pp.forgetAfter) ? pp.forgetAfter : 10,
@@ -253,10 +258,17 @@ const state = {
   lastSeen: new Map(Object.entries(store.people.lastSeen)), // id -> dernière fois vu dans ton vocal (ms)
 };
 
+// Rôle d'une personne : celui choisi à la main, sinon celui trouvé dans le client League.
+const roleOf = id => (state.custom.get(id) || {}).role || league.roles.get(id) || '';
+
+// Ordre : d'abord les rôles (Top → Support), puis les autres selon l'ordre personnalisé.
 function orderedMembers() {
   const pos = new Map(state.order.map((id, i) => [id, i]));
   return [...state.members.values()]
-    .map((m, i) => ({ m, k: pos.has(m.id) ? pos.get(m.id) : 1e6 + i }))
+    .map((m, i) => {
+      const r = ROLES.indexOf(roleOf(m.id));
+      return { m, k: r >= 0 ? r - 100 : (pos.has(m.id) ? pos.get(m.id) : 1e6 + i) };
+    })
     .sort((a, b) => a.k - b.k)
     .map(x => x.m);
 }
@@ -276,8 +288,12 @@ function snapshot() {
     selfId: state.selfId,
     members: orderedMembers().map(m => {
       const c = state.custom.get(m.id) || {};
-      return { ...m, realName: m.name, name: c.name || m.name, hidden: !!c.hidden, speaking: state.speaking.has(m.id) };
+      return {
+        ...m, realName: m.name, name: c.name || m.name, hidden: !!c.hidden, speaking: state.speaking.has(m.id),
+        role: roleOf(m.id), manualRole: c.role || '', autoRole: league.roles.get(m.id) || '',
+      };
     }),
+    league: { status: league.status },
   };
 }
 
@@ -565,7 +581,8 @@ async function handleApi(url, req, res) {
       const c = { ...(state.custom.get(id) || {}) };
       if ('name' in b) c.name = String(b.name || '').trim().slice(0, 40);
       if ('hidden' in b) c.hidden = !!b.hidden;
-      if (c.name || c.hidden) state.custom.set(id, c); else state.custom.delete(id);
+      if ('role' in b) c.role = ROLES.includes(b.role) ? b.role : '';
+      if (c.name || c.hidden || c.role) state.custom.set(id, c); else state.custom.delete(id);
       state.lastSeen.set(id, Date.now());
       savePeopleSoon();
       broadcast();
@@ -851,6 +868,171 @@ async function authenticate(rpc) {
   tok = await exchangeToken({ grant_type: 'authorization_code', code, redirect_uri: config.redirectUri });
   return rpc.request('AUTHENTICATE', { access_token: tok.access_token });
 }
+
+// ---------- Rôles League of Legends (lecture du client League ouvert sur ce PC) ----------
+// L'overlay lit, en local et sans rien envoyer à Riot, le salon de la partie et la sélection
+// des champions, puis relie chaque Riot ID à la personne du vocal Discord dont le pseudo ressemble.
+// API locale non officielle du client : si Riot la change, le choix manuel du rôle reste possible.
+const league = {
+  status: 'off',            // off (client fermé) | on (client ouvert) | game (en partie)
+  roles: new Map(),         // id Discord -> rôle trouvé automatiquement
+  players: [],              // [{ name, tag, role }] vus dans le client
+  lastDump: '',
+};
+
+const POS = {
+  top: 'top', toplane: 'top',
+  jungle: 'jungle', jungler: 'jungle', jgl: 'jungle', jg: 'jungle',
+  mid: 'mid', middle: 'mid', midlane: 'mid',
+  adc: 'adc', bottom: 'adc', bot: 'adc', carry: 'adc', marksman: 'adc',
+  support: 'support', utility: 'support', supp: 'support', sup: 'support',
+};
+const toRole = v => POS[String(v || '').toLowerCase().replace(/[^a-z]/g, '')] || '';
+
+function leagueDirs() {
+  const dirs = [];
+  try {
+    const yaml = fs.readFileSync('C:\\ProgramData\\Riot Games\\Metadata\\league_of_legends.live\\league_of_legends.live.product_settings.yaml', 'utf8');
+    const m = /product_install_full_path:\s*"?([^"\r\n]+)"?/.exec(yaml);
+    if (m) dirs.push(m[1].trim());
+  } catch {}
+  for (const d of 'CDEFG') dirs.push(`${d}:\\Riot Games\\League of Legends`);
+  return dirs;
+}
+
+function readLockfile() {
+  for (const dir of leagueDirs()) {
+    try {
+      const [, , port, password, protocol] = fs.readFileSync(path.join(dir, 'lockfile'), 'utf8').split(':');
+      if (port && password) return { port: Number(port), password, protocol: protocol || 'https' };
+    } catch {}
+  }
+  return null;
+}
+
+// Requête locale vers le client League (certificat auto-signé de Riot, uniquement sur 127.0.0.1).
+function localGet(port, pathName, auth) {
+  return new Promise(resolve => {
+    const req = https.get({
+      host: '127.0.0.1', port, path: pathName, rejectUnauthorized: false, timeout: 2500,
+      headers: auth ? { Authorization: 'Basic ' + Buffer.from('riot:' + auth).toString('base64'), Accept: 'application/json' } : {},
+    }, res => {
+      let data = '';
+      res.on('data', c => { data += c; if (data.length > 2e6) req.destroy(); });
+      res.on('end', () => { if (res.statusCode !== 200) return resolve(null); try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+// Parcourt une réponse du client et récupère les joueurs qui ont un rôle, quel que soit le format exact.
+function collectPlayers(node, out, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 8) return;
+  if (Array.isArray(node)) { for (const x of node) collectPlayers(x, out, depth + 1); return; }
+  const role = toRole(node.assignedPosition || node.position || node.selectedPosition || node.firstPositionPreference || node.teamPosition);
+  const riot = String(node.riotId || node.riotIdGameName || node.gameName || node.summonerName || '').trim();
+  if ((node.puuid || riot) && role) {
+    const [name, tag] = riot.includes('#') ? riot.split('#') : [riot, node.riotIdTagLine || node.tagLine || ''];
+    out.push({ puuid: node.puuid || '', name, tag, role });
+  }
+  for (const k of Object.keys(node)) if (node[k] && typeof node[k] === 'object') collectPlayers(node[k], out, depth + 1);
+}
+
+const nameCache = new Map(); // puuid -> { name, tag }
+
+async function readLeague() {
+  const players = [];
+  const raw = {};
+  // 1. En partie : l'API du jeu donne les 10 joueurs avec leur rôle.
+  const live = await localGet(2999, '/liveclientdata/playerlist');
+  if (Array.isArray(live) && live.length) {
+    raw.ingame = live;
+    collectPlayers(live, players);
+    league.status = 'game';
+  } else {
+    // 2. Dans le client : salon de la partie, puis sélection des champions.
+    const lock = readLockfile();
+    if (!lock) { league.status = 'off'; return []; }
+    const [lobby, session] = await Promise.all([
+      localGet(lock.port, '/lol-lobby/v2/lobby', lock.password),
+      localGet(lock.port, '/lol-champ-select/v1/session', lock.password),
+    ]);
+    league.status = lobby || session ? 'on' : 'off';
+    if (lobby) { raw.lobby = lobby; collectPlayers(lobby, players); }
+    if (session) { raw.champSelect = session; collectPlayers(session, players); }
+    // Noms manquants : on les demande au client à partir du puuid.
+    for (const p of players) {
+      if (p.name || !p.puuid) continue;
+      if (!nameCache.has(p.puuid)) {
+        const s = await localGet(lock.port, `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(p.puuid)}`, lock.password);
+        nameCache.set(p.puuid, s ? { name: s.gameName || s.displayName || '', tag: s.tagLine || '' } : { name: '', tag: '' });
+      }
+      Object.assign(p, nameCache.get(p.puuid));
+    }
+  }
+  // Journal de diagnostic : ce que le client a vraiment renvoyé (aucune donnée de connexion dedans).
+  const dump = JSON.stringify({ at: new Date().toISOString(), players, raw }, null, 1).slice(0, 400000);
+  if (Object.keys(raw).length && dump.replace(/"at":[^,]+,/, '') !== league.lastDump.replace(/"at":[^,]+,/, '')) {
+    league.lastDump = dump;
+    try { fs.writeFileSync(path.join(DIR, 'league-debug.json'), dump); } catch {}
+  }
+  // Un même joueur peut apparaître deux fois (salon + sélection) : on garde la dernière info.
+  const byKey = new Map();
+  for (const p of players) if (p.name) byKey.set(p.puuid || p.name.toLowerCase(), p);
+  return [...byKey.values()];
+}
+
+// Ressemblance entre un pseudo Discord et un pseudo League.
+const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function similarity(a, b) {
+  a = norm(a); b = norm(b);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (Math.min(a.length, b.length) >= 3 && (a.includes(b) || b.includes(a))) return 0.9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return 1 - d[a.length][b.length] / Math.max(a.length, b.length);
+}
+
+function matchRoles(players) {
+  const found = new Map();
+  const pairs = [];
+  for (const m of state.members.values()) {
+    const discordNames = [m.name, (state.custom.get(m.id) || {}).name].filter(Boolean);
+    for (const p of players) {
+      const score = Math.max(...discordNames.map(n => similarity(n, p.name)));
+      if (score >= 0.75) pairs.push({ id: m.id, p, score });
+    }
+  }
+  // Les meilleures ressemblances d'abord ; une personne et un joueur ne servent qu'une fois.
+  const usedP = new Set();
+  for (const { id, p, score } of pairs.sort((x, y) => y.score - x.score)) {
+    if (found.has(id) || usedP.has(p)) continue;
+    found.set(id, p.role);
+    usedP.add(p);
+  }
+  return found;
+}
+
+async function leagueTick() {
+  let players = [];
+  try { players = await readLeague(); } catch {}
+  league.players = players;
+  const roles = matchRoles(players);
+  const changed = roles.size !== league.roles.size || [...roles].some(([id, r]) => league.roles.get(id) !== r);
+  const statusChanged = leagueTick.lastStatus !== league.status;
+  leagueTick.lastStatus = league.status;
+  // Hors partie et hors salon, on garde les derniers rôles connus (le temps de rejoindre la game).
+  if (players.length) league.roles = roles;
+  if ((players.length && changed) || statusChanged) broadcast();
+}
+if ((WIN || process.env.VO_LEAGUE) && !DEMO) setInterval(leagueTick, 3000);
 
 // ---------- Suivi du salon vocal ----------
 const CHANNEL_EVENTS = ['VOICE_STATE_CREATE', 'VOICE_STATE_UPDATE', 'VOICE_STATE_DELETE', 'SPEAKING_START', 'SPEAKING_STOP'];

@@ -51,6 +51,13 @@
     max-width: calc(var(--size) * 5.5); overflow: hidden; text-overflow: ellipsis;
   }
   body.noname .name { display: none; }
+  .role {
+    flex: none; font-weight: 800; letter-spacing: .04em; color: #fff;
+    font-size: calc(var(--size) * .24); padding: .25em .5em; border-radius: 999px;
+    background: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+  .role[hidden], body.noroles .role { display: none; }
+  body.row .role { order: -1; }
 
   .tail { display: flex; align-items: center; justify-content: center; }
   .tail svg { width: calc(var(--size) * .42); height: calc(var(--size) * .42); fill: var(--mute); display: none; }
@@ -114,6 +121,7 @@
 <template id="tpl">
   <div class="m">
     <span class="avw"><img class="av" alt=""><img class="deco" alt="" hidden></span>
+    <span class="role" hidden></span>
     <span class="name"></span>
     <span class="tail">
       <span class="eq"><i></i><i></i><i></i></span>
@@ -130,7 +138,8 @@
   //   ?title  ?noTitle  ?hideSelf  ?speakingOnly  ?noName  ?size=48  ?align=right  ?layout=row
   const p = new URLSearchParams(location.search);
   const PREVIEW = p.has('preview');
-  const PROFILE = p.get('profile'); // ?profile=… : quel profil d'overlay afficher (sinon le premier)
+  const PROFILE = p.get('profile');
+  const ROLE_LABEL = { top: 'TOP', jungle: 'JGL', mid: 'MID', adc: 'ADC', support: 'SUP' }; // ?profile=… : quel profil d'overlay afficher (sinon le premier)
 
   function withOverrides(s) {
     s = { ...s };
@@ -170,6 +179,7 @@
     c.toggle('row', s.layout === 'row');
     c.toggle('noname', !s.showNames);
     c.toggle('noicons', !s.showIcons);
+    c.toggle('noroles', !s.showRoles);
     c.toggle('nodeco', !s.showDecorations);
     c.toggle('dim', s.dimSilent);
     c.toggle('anim', s.animate);
@@ -188,7 +198,7 @@
     channel: { name: 'Inhouse #12' }, selfId: 'a',
     members: ['CAILLOU', 'Zed main', 'Jungle Diff', 'mid or feed', 'Support Gap'].map((name, i) => ({
       id: 'abcde'[i], name, avatar: `https://cdn.discordapp.com/embed/avatars/${i}.png`,
-      mute: i === 3, deaf: i === 4, speaking: i === 1,
+      mute: i === 3, deaf: i === 4, speaking: i === 1, role: ['top', 'jungle', 'mid', 'adc', 'support'][i],
     })),
   };
   let last = null;
@@ -241,6 +251,9 @@
       deco.hidden = !m.deco;
       if (m.deco && deco.getAttribute('src') !== m.deco) deco.src = m.deco;
       el.querySelector('.name').textContent = m.name;
+      const role = el.querySelector('.role');
+      role.hidden = !m.role;
+      role.textContent = ROLE_LABEL[m.role] || '';
       el.classList.toggle('speaking', !!m.speaking);
       el.classList.toggle('mute', m.mute && !m.deaf);
       el.classList.toggle('deaf', m.deaf);

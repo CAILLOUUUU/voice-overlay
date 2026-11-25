@@ -10,6 +10,7 @@ Overlay OBS qui affiche les personnes présentes dans **ton** salon vocal Discor
 - Suit le vocal où tu te trouves, et n'affiche rien quand tu n'es dans aucun
 - Renommer, réordonner ou masquer des personnes à la volée, sans tout perdre si Discord plante
 - Page de réglages en direct : disposition, couleurs, 12 polices fournies (ou importe la tienne), CSS personnalisé
+- Rôles League of Legends (Top, Jungle, Mid, ADC, Support) détectés depuis le client League quand le pseudo ressemble, ou choisis à la main, avec tri automatique
 - Plusieurs profils d'overlay utilisables en même temps (par exemple vertical en jeu, horizontal ailleurs), chacun avec son lien OBS
 - Exporte ton style dans un fichier pour le partager
 - En français et en anglais

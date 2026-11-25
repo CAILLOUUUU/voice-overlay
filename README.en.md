@@ -10,6 +10,7 @@ An OBS overlay that shows who is in **your** Discord voice channel, and follows 
 - Follows whatever voice channel you are in, and shows nothing when you are in none
 - Rename, reorder or hide people on the fly, without losing it all if Discord crashes
 - Live settings page: layout, colors, 12 included fonts (or import your own), custom CSS
+- League of Legends roles (Top, Jungle, Mid, ADC, Support) detected from the League client when names look alike, or picked by hand, with automatic sorting
 - Several overlay profiles usable at the same time (for example vertical in game, horizontal elsewhere), each with its own OBS link
 - Export your style to a file and share it
 - English and French
