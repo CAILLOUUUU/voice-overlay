@@ -129,12 +129,7 @@ const config = { port: 47474, redirectUri: 'http://localhost', clientId: '', cli
 Object.assign(config, readJson(CONFIG_PATH) || {});
 if (/^COLLE_/.test(config.clientId)) config.clientId = '';
 if (/^COLLE_/.test(config.clientSecret)) config.clientSecret = '';
-// Appli Discord partagée (« connexion rapide ») : réglée en « Public Client » sur le portail,
-// elle n'a pas besoin de Client Secret, donc aucun secret n'est embarqué dans l'appli.
-// Elle ne marche que pour son propriétaire et ses testeurs (50 max), ajoutés dans le portail Discord.
-const SHARED_CLIENT_ID = '1571939697540735026';
-const isShared = () => config.clientId === SHARED_CLIENT_ID && !config.clientSecret;
-const hasConfig = () => !!(config.clientId && (config.clientSecret || config.clientId === SHARED_CLIENT_ID));
+const hasConfig = () => !!(config.clientId && config.clientSecret);
 const BASE_URL = `http://localhost:${config.port}`;
 
 // ---------- Réglages de l'overlay (modifiables depuis /settings) ----------
@@ -566,11 +561,10 @@ async function handleApi(url, req, res) {
     }
 
     case '/api/config': {
-      const shared = !!b.shared;
-      const id = shared ? SHARED_CLIENT_ID : String(b.clientId || '').trim();
-      const secret = shared ? '' : String(b.clientSecret || '').trim() || (id === config.clientId ? config.clientSecret : '');
+      const id = String(b.clientId || '').trim();
+      const secret = String(b.clientSecret || '').trim() || (id === config.clientId ? config.clientSecret : '');
       if (!/^\d{15,22}$/.test(id)) return sendJson(res, 400, { error: M('Le Client ID doit être une suite de chiffres.', 'The Client ID must be digits only.') });
-      if (!shared && secret.length < 10) return sendJson(res, 400, { error: M('Le Client Secret a l\'air incomplet.', 'The Client Secret looks incomplete.') });
+      if (secret.length < 10) return sendJson(res, 400, { error: M('Le Client Secret a l\'air incomplet.', 'The Client Secret looks incomplete.') });
       config.clientId = id;
       config.clientSecret = secret;
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
@@ -829,8 +823,7 @@ class DiscordRPC {
 
 // ---------- Authentification (une seule fois, puis token sauvegardé) ----------
 async function exchangeToken(params) {
-  const body = new URLSearchParams({ client_id: config.clientId, ...params });
-  if (config.clientSecret) body.set('client_secret', config.clientSecret);
+  const body = new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, ...params });
   const r = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1150,15 +1143,7 @@ async function run() {
       if (rpc && rpc.sock) rpc.sock.destroy();
       if (!restartRequested) {
         if (e.code === 'NO_DISCORD') setStatus('no-discord', M('Discord introuvable : l\'appli Discord (desktop) est bien ouverte ?', 'Discord not found: is the Discord desktop app open?'));
-        else {
-          blocked = e.code === 'BLOCKED';
-          let msg = e.msg || M(e.message, e.message);
-          // Connexion rapide refusée : le plus souvent, la personne n'est pas encore testeuse de l'appli partagée.
-          if (isShared()) msg = M(
-            `${msg.fr} Avec la connexion rapide, Caillou doit d'abord t'ajouter comme testeur de son appli Discord (et tu dois accepter l'invitation). Sinon, choisis « Créer ma propre clé ».`,
-            `${msg.en} With quick connect, Caillou must first add you as a tester of his Discord app (and you must accept the invite). Otherwise, choose "Create my own key".`);
-          setStatus('error', msg);
-        }
+        else { blocked = e.code === 'BLOCKED'; setStatus('error', e.msg || M(e.message, e.message)); }
       }
     }
     currentChannel = null;
