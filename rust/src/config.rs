@@ -60,10 +60,26 @@ fn move_old_data(from: &Path, to: &Path) {
         if !src.exists() || dst.exists() {
             continue;
         }
-        // rename marche si c'est le même disque ; sinon on laisse les fichiers où ils sont.
-        let _ = fs::rename(&src, &dst);
+        // Même disque : on renomme. Autre disque (D:\Téléchargements…) : on copie puis on supprime, comme la 1.2.
+        if fs::rename(&src, &dst).is_err() && copy_all(&src, &dst).is_ok() {
+            let _ = if src.is_dir() { fs::remove_dir_all(&src) } else { fs::remove_file(&src) };
+        }
     }
 }
+
+fn copy_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if src.is_dir() {
+        fs::create_dir_all(dst)?;
+        for e in fs::read_dir(src)? {
+            let e = e?;
+            copy_all(&e.path(), &dst.join(e.file_name()))?;
+        }
+        Ok(())
+    } else {
+        fs::copy(src, dst).map(|_| ())
+    }
+}
+
 
 pub struct Config {
     pub port: u16,
@@ -199,4 +215,19 @@ pub fn token_save(paths: &Paths, v: &Value) {
 pub fn token_clear(paths: &Paths) {
     secret_set("discord-token", "");
     let _ = fs::remove_file(&paths.token);
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn copies_old_data_including_fonts() {
+        let (a, b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        std::fs::write(a.path().join("settings.json"), "{}").unwrap();
+        std::fs::create_dir(a.path().join("polices")).unwrap();
+        std::fs::write(a.path().join("polices/x.ttf"), "f").unwrap();
+        super::copy_all(&a.path().join("polices"), &b.path().join("polices")).unwrap();
+        super::move_old_data(a.path(), b.path());
+        assert!(b.path().join("settings.json").exists() && b.path().join("polices/x.ttf").exists());
+        assert!(!a.path().join("settings.json").exists());
+    }
 }
