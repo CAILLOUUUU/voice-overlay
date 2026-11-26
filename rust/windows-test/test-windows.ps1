@@ -27,6 +27,17 @@ function Ask($question) {
     do { $a = (Read-Host "$question [y/n]").Trim().ToLower() } while ($a -ne 'y' -and $a -ne 'n')
     return $a -eq 'y'
 }
+# y / n / s (skip): $null when skipped
+function AskOpt($question) {
+    do { $a = (Read-Host "$question [y/n, s = skip]").Trim().ToLower() } while ('y', 'n', 's' -notcontains $a)
+    if ($a -eq 's') { return $null }
+    return $a -eq 'y'
+}
+function ListenerPid {
+    $c = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($c) { return [int]$c.OwningProcess }
+    return $null
+}
 function Api($path, $body = $null) {
     try {
         if ($null -eq $body) { return Invoke-RestMethod -Uri "$base$path" -TimeoutSec 10 }
@@ -94,6 +105,49 @@ foreach ($f in 'config.json', 'token.json', 'settings.json', 'polices') {
 }
 Note "Existing Voice Overlay data copied: $hadData"
 $hadToken = Test-Path (Join-Path $testData 'token.json')
+$oldSecret = ''
+if ($hadData) { try { $oldSecret = [string](Get-Content (Join-Path $testData 'config.json') -Raw | ConvertFrom-Json).clientSecret } catch { } }
+
+# Fake "new version 9.9.9" served on this PC, to test the one-click update for real
+$feedPort = 47481
+$feedDir = Join-Path $env:TEMP 'VoiceOverlayRustFeed'
+Remove-Item -Recurse -Force $feedDir -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Path $feedDir | Out-Null
+$feedExe = Join-Path $feedDir 'Voice-Overlay-9.9.9.exe'
+Copy-Item $exe.FullName $feedExe
+$feedSha = (Get-FileHash -Algorithm SHA256 $feedExe).Hash.ToLower()
+$feedJson = @{
+    tag_name = 'v9.9.9'; html_url = "http://127.0.0.1:$feedPort/page"
+    assets = @(@{ name = 'Voice-Overlay-9.9.9.exe'; size = (Get-Item $feedExe).Length; digest = "sha256:$feedSha"
+                  browser_download_url = "http://127.0.0.1:$feedPort/Voice-Overlay-9.9.9.exe" })
+} | ConvertTo-Json -Depth 5
+[IO.File]::WriteAllText((Join-Path $feedDir 'latest'), $feedJson)
+$feedJob = Start-Job -ArgumentList $feedDir, $feedPort -ScriptBlock {
+    param($dir, $p)
+    $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $p)
+    $l.Start()
+    while ($true) {
+        # Short waits instead of a blocking accept, so Stop-Job can end this job
+        if (-not $l.Pending()) { Start-Sleep -Milliseconds 100; continue }
+        $c = $l.AcceptTcpClient()
+        try {
+            $st = $c.GetStream()
+            $rd = New-Object System.IO.StreamReader($st)
+            $first = $rd.ReadLine()
+            while ($true) { $h = $rd.ReadLine(); if ([string]::IsNullOrEmpty($h)) { break } }
+            $name = ($first -split ' ')[1].TrimStart('/')
+            $f = Join-Path $dir $name
+            if ($name -match '^[A-Za-z0-9.-]+$' -and (Test-Path $f -PathType Leaf)) {
+                $body = [IO.File]::ReadAllBytes($f); $code = '200 OK'
+            } else { $body = [byte[]]@(); $code = '404 Not Found' }
+            $hb = [Text.Encoding]::ASCII.GetBytes("HTTP/1.1 $code`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n")
+            $st.Write($hb, 0, $hb.Length)
+            if ($body.Length) { $st.Write($body, 0, $body.Length) }
+            $st.Flush()
+        } catch { } finally { $c.Close() }
+    }
+}
+$env:VO_UPDATE_FEED = "http://127.0.0.1:$feedPort/latest"
 
 # Start-with-Windows entry: saved now, restored at the end
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
@@ -184,14 +238,50 @@ if (-not $state) {
     Check 'Start with Windows: turn off' ($off -and -not $off.autostart -and -not $val)
     if ($prevRun) { Set-ItemProperty -Path $runKey -Name 'VoiceOverlayCaillou' -Value $prevRun }
 
+    # ---------- Diagnostics report ----------
+    $diag = ''
+    try { $diag = (Invoke-WebRequest -Uri "$base/api/diagnostics" -UseBasicParsing -TimeoutSec 10).Content } catch { }
+    Check 'Diagnostics report' ($diag -like 'Voice Overlay*') "$(($diag -split "`n").Count) lines"
+    if ($oldSecret.Length -ge 10) { Check 'Diagnostics contain no Client Secret' (-not $diag.Contains($oldSecret)) }
+
+    # ---------- One-click update (fake version 9.9.9 served on this PC) ----------
+    $snap = Snapshot
+    Check 'Update found' ($snap -and $snap.update -and $snap.update.canInstall) "$($snap.update.version)"
+    if ($snap -and $snap.update -and $snap.update.canInstall) {
+        $oldPid = ListenerPid
+        Api '/api/update-install' '{}' | Out-Null
+        $newPid = $null
+        $end = (Get-Date).AddSeconds(40)
+        do {
+            Start-Sleep -Seconds 1
+            $lp = ListenerPid
+            if ($lp -and $lp -ne $oldPid -and (Api '/api/state')) { $newPid = $lp }
+        } while (-not $newPid -and (Get-Date) -lt $end)
+        $why = ''
+        $s2 = Snapshot
+        if ($s2 -and $s2.updateStatus -and $s2.updateStatus.error) { $why = $s2.updateStatus.error.en }
+        Check 'Update installs itself and restarts' ([bool]$newPid) "pid $oldPid -> $newPid $why"
+        if ($newPid) {
+            $proc = Get-Process -Id $newPid
+            Start-Sleep -Seconds 6
+            $oldExe = [IO.Path]::ChangeExtension($exe.FullName, 'old.exe')
+            Check 'Old version cleaned up after the update' (-not (Test-Path $oldExe))
+            Check 'Old process closed' (-not (Get-Process -Id $oldPid -ErrorAction SilentlyContinue))
+        }
+    }
+
     # ---------- What only you can see ----------
     Say ''
     Say 'A few things only you can check:' 'Cyan'
     Say '(The tray icon may be hidden behind the ^ arrow next to the clock.)'
     Check 'You see the Voice Overlay icon next to the clock' (Ask 'Do you see the Voice Overlay icon next to the clock?')
+    Check 'Only one icon after the update' (Ask 'Move the mouse over the icons next to the clock. Is there exactly ONE Voice Overlay icon?')
     Check 'Left-click on the icon opens the settings' (Ask 'Left-click the icon: does the settings page open in your browser?')
     Check 'Right-click shows the menu' (Ask 'Right-click the icon: do you see "Open settings" and "Quit"?')
     Check 'Settings page looks normal' (Ask 'Does the settings page look like the usual one (no errors, preview visible)?')
+    Check 'Ready-made styles' (Ask 'In "Ready-made styles", click a style: does the preview on the right change?')
+    $r = AskOpt 'Under "Overlay profiles", click "Add to OBS..." and follow the help text (needs OBS open). Did the source appear in OBS?'
+    if ($null -eq $r) { Note 'Add to OBS: skipped' } else { Check 'Add to OBS automatically' $r }
     $mem = [math]::Round((Get-Process -Id $proc.Id -ErrorAction SilentlyContinue).WorkingSet64 / 1MB, 1)
     Note "Memory used by the app: $mem MB"
     Check 'Quit from the tray menu closes the app' (Ask 'Right-click the icon and choose Quit. Did the icon disappear?')
@@ -204,6 +294,8 @@ if (-not $proc.HasExited) {
     if (-not $proc.WaitForExit(3000)) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
     Note 'App closed by the script.'
 }
+Stop-Job $feedJob -ErrorAction SilentlyContinue; Remove-Job $feedJob -Force -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force $feedDir -ErrorAction SilentlyContinue
 foreach ($line in (cmdkey /list)) {
     if ($line -match 'target=(.*VoiceOverlayCaillou)') { cmdkey /delete:$($Matches[1]) | Out-Null }
 }
@@ -214,6 +306,7 @@ $out = Join-Path $env:TEMP 'VoiceOverlayRustReport'
 Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $out | Out-Null
 $report | Set-Content -Path (Join-Path $out 'report.txt') -Encoding UTF8
+if ($diag) { $diag | Set-Content -Path (Join-Path $out 'diagnostics.txt') -Encoding UTF8 }
 foreach ($f in 'voice-overlay.log', 'voice-overlay.log.old') {
     $p = Join-Path $testData $f
     if (Test-Path $p) { Copy-Item $p $out }

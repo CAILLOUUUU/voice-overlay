@@ -302,7 +302,9 @@ pub async fn run(app: Arc<App>) {
     let mut reader = Reader { http, finder: Finder { from_process: None, from_args: None, checked_at: None, sys: sysinfo::System::new(), last_note: String::new() }, names: HashMap::new() };
     loop {
         let (status, me, players) = reader.read(&app).await;
+        let note = reader.finder.last_note.clone();
         app.update(|i| {
+            i.league.note = note;
             let status_changed = i.league.status != status;
             i.league.status = status;
             if me.is_some() {

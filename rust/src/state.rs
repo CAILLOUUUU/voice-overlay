@@ -36,6 +36,9 @@ pub struct Channel {
 pub struct Update {
     pub version: String,
     pub url: String,
+    /// La page peut proposer « Installer » (sinon seulement le lien de téléchargement).
+    #[serde(rename = "canInstall")]
+    pub can_install: bool,
 }
 
 #[derive(Default)]
@@ -46,6 +49,8 @@ pub struct League {
     pub roles: HashMap<String, String>,
     /// Ton propre Riot ID, lu dans le client League.
     pub me: Option<RiotLink>,
+    /// Dernier diagnostic de détection (pour « Copier le diagnostic »).
+    pub note: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,6 +102,9 @@ pub struct Inner {
     pub profiles: Vec<Profile>,
     pub forget_after: i64,
     pub update: Option<Update>,
+    pub update_asset: Option<crate::updater::Asset>,
+    /// downloading | restarting | error (+ message)
+    pub update_status: Option<(&'static str, Option<M>)>,
     pub assets_version: i64,
     pub league: League,
     pub dpm: Dpm,
@@ -123,6 +131,8 @@ impl Inner {
             profiles: loaded.profiles,
             forget_after: loaded.forget_after,
             update: None,
+            update_asset: None,
+            update_status: None,
             assets_version: now_ms(),
             league: League { status: "off", ..Default::default() },
             dpm: Dpm { links: loaded.links, ..Default::default() },
@@ -251,6 +261,7 @@ impl Inner {
             "user": self.user,
             "version": VERSION,
             "update": self.update,
+            "updateStatus": self.update_status.as_ref().map(|(s, e)| json!({ "state": s, "error": e })),
             "lang": self.lang,
             "profiles": self.profiles.iter().map(|p| (p.id.clone(), Value::Object(p.settings.clone()))).collect::<serde_json::Map<_, _>>(),
             "defaultProfile": self.profiles[0].id,

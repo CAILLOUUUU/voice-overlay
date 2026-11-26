@@ -308,7 +308,13 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
                     "defaults": settings::defaults(), "clientId": client_id, "hasConfig": has, "port": port,
                     "canAutostart": platform::CAN_AUTOSTART, "autostart": autostart, "isExe": true,
                     "dataDir": app.paths.dir.display().to_string(),
+                    // Ce que cette version sait faire (la page cache le reste).
+                    "features": ["diagnostics", "update-install"],
                 }))
+            }
+            "/api/diagnostics" => {
+                let text = diagnostics(app).await;
+                ([(header::CONTENT_TYPE, "text/plain; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], text).into_response()
             }
             "/api/files" => json_resp(200, json!({
                 "builtinFonts": BUILTIN_FONTS.iter().map(|f| f.0).collect::<Vec<_>>(),
@@ -538,6 +544,13 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
             .unwrap_or(false);
             json_resp(200, json!({ "ok": true, "autostart": now }))
         }
+        "/api/update-install" => {
+            if !app.read(|i| i.update.as_ref().is_some_and(|u| u.can_install)) {
+                return err(400, m("Aucune mise à jour à installer.", "No update to install."));
+            }
+            tokio::spawn(crate::updater::install(app.clone()));
+            ok()
+        }
         "/api/retry" => {
             app.request_restart();
             ok()
@@ -552,12 +565,51 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_millis(300)).await;
                 a.save_store();
-                std::process::exit(0);
+                tokio::task::spawn_blocking(platform::exit_app);
             });
             ok()
         }
         _ => plain(404, "inconnu"),
     }
+}
+
+/// Rapport à copier pour signaler un souci : versions, états, détection League/DPM, fin du journal.
+/// Pas de mot de passe, pas de jeton, pas de Client Secret.
+async fn diagnostics(app: &Arc<App>) -> String {
+    let (port, has_cfg, ext) = {
+        let c = app.config.lock().unwrap();
+        (c.port, c.has_credentials(), c.extension_ids.len())
+    };
+    let autostart = platform::CAN_AUTOSTART && tokio::task::spawn_blocking(platform::autostart).await.unwrap_or(false);
+    let snap = app.read(|i| i.snapshot());
+    let league_note = app.read(|i| i.league.note.clone());
+    let mut sys = sysinfo::System::new();
+    let pid = sysinfo::get_current_pid().ok();
+    if let Some(pid) = pid {
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
+    }
+    let mem = pid.and_then(|p| sys.process(p)).map(|p| p.memory() / 1_048_576).unwrap_or(0);
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    let hide_home = |s: String| if home.is_empty() { s } else { s.replace(&home, "~") };
+    let msg_en = snap["statusMsg"]["en"].as_str().unwrap_or("").to_string();
+    let mut out = vec![
+        format!("Voice Overlay {VERSION} (Rust) - diagnostic du {}", chrono::Local::now().format("%Y-%m-%d %H:%M")),
+        format!("Système : {} {}", sysinfo::System::long_os_version().unwrap_or_else(|| std::env::consts::OS.into()), std::env::consts::ARCH),
+        format!("Langue : {} (système : {})", snap["lang"], sys_locale::get_locale().unwrap_or_default()),
+        format!("Port : {port}   identifiants Discord : {}   lancement avec Windows : {autostart}", if has_cfg { "oui" } else { "non" }),
+        format!("Dossier des données : {}", hide_home(app.paths.dir.display().to_string())),
+        format!("Mémoire utilisée : {mem} Mo"),
+        String::new(),
+        format!("Discord : {}  {msg_en}", snap["status"].as_str().unwrap_or("")),
+        format!("Salon vocal : {}  ({} personne(s))", if snap["channel"].is_null() { "aucun" } else { "oui" }, snap["members"].as_array().map_or(0, Vec::len)),
+        format!("League : {}  {league_note}", snap["league"]["status"].as_str().unwrap_or("")),
+        format!("DPM : {}   extensions autorisées : {}", snap["dpm"], if ext == 0 { "toutes".to_string() } else { ext.to_string() }),
+        format!("Profils : {}   mise à jour : {}", snap["profiles"].as_object().map_or(0, |o| o.len()), snap["update"]),
+        String::new(),
+        "--- Fin du journal ---".into(),
+    ];
+    out.extend(crate::util::recent_log().into_iter().map(hide_home));
+    out.join("\n") + "\n"
 }
 
 #[cfg(test)]

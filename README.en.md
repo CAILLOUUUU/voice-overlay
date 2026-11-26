@@ -74,6 +74,22 @@ cargo build --release              # .exe in rust/target/release (on Windows)
 
 From macOS or Linux: `rustup target add x86_64-pc-windows-gnu`, install `mingw-w64`, then `cargo build --release --target x86_64-pc-windows-gnu`. The `.github/workflows/rust.yml` workflow builds the `.exe` on Windows and attaches it to the release for every `v*` tag.
 
+What the Rust version adds to the settings page:
+
+- **One-click update**: when a new version is out, the "Install now" button downloads it from the GitHub release, checks its SHA-256 fingerprint (provided by GitHub), replaces the `.exe` and restarts the app. If anything goes wrong, the old version stays in place.
+- **Ready-made styles**, with a small preview and an undo button.
+- **Drag and drop** to reorder people (mouse or finger; arrow keys work too).
+- **Add to OBS automatically**, through the WebSocket server built into OBS 28 and later: the "Browser" source is created (or updated) in the chosen scene.
+- **Copy diagnostics**: a report to send when something goes wrong (versions, statuses, League/DPM detection, end of the log; no passwords or Discord codes).
+
+#### Signing the `.exe` (removes the "Windows protected your PC" warning)
+
+1. Apply for the free open-source plan at [signpath.org](https://signpath.org) (the repository must be public).
+2. In SignPath, create a `voice-overlay` project linked to this GitHub repository, with a `release-signing` signing policy.
+3. On GitHub, under Settings → Secrets and variables → Actions: add the `SIGNPATH_ORGANIZATION_ID` variable and the `SIGNPATH_API_TOKEN` secret.
+
+From then on, every `v*` tag publishes a signed `.exe`. Until this is set up, the workflow publishes the `.exe` unsigned, as before.
+
 Useful options: `--port=N` (or `VO_PORT`), `--silent`, `VO_DATA_DIR` (other data folder), `VO_ASSETS_DIR=..` (reads the pages from disk, no rebuild), `VO_NO_KEYRING=1` (secrets in files), `VO_DEBUG=1` (detailed log). In `config.json`, `extensionIds` restricts the DPM bridge to specific extensions. The extension calls port 47474: if you change it, edit `extension/background.js` too.
 
 ## Credits

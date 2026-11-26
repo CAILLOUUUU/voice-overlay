@@ -14,6 +14,35 @@ pub fn open_folder(p: &Path) {
 
 pub const CAN_AUTOSTART: bool = cfg!(windows);
 
+/// Fil de l'icône près de l'horloge (0 = pas d'icône).
+#[cfg(windows)]
+static TRAY_THREAD: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Ferme l'appli. Avec l'icône, on la retire d'abord proprement : sinon Windows laisse une icône
+/// « fantôme » près de l'horloge jusqu'au passage de la souris.
+pub fn exit_app() {
+    #[cfg(windows)]
+    {
+        use std::sync::atomic::Ordering;
+        use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+        use windows_sys::Win32::UI::WindowsAndMessaging::{PostQuitMessage, PostThreadMessageW, WM_QUIT};
+        let t = TRAY_THREAD.load(Ordering::SeqCst);
+        if t != 0 {
+            unsafe {
+                if GetCurrentThreadId() == t {
+                    // Appelé depuis le menu de l'icône : la boucle s'arrête, puis main() ferme l'appli.
+                    PostQuitMessage(0);
+                    return;
+                }
+                PostThreadMessageW(t, WM_QUIT, 0, 0);
+            }
+            // main() ferme l'appli dès que l'icône est retirée ; au cas où, on ferme quand même.
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+    }
+    std::process::exit(0);
+}
+
 #[cfg(windows)]
 mod win {
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
@@ -59,21 +88,26 @@ pub fn set_autostart(on: bool) -> bool {
 
 /// Icône près de l'horloge : clic gauche = réglages, clic droit = menu (réglages / quitter).
 /// Bloque le fil d'exécution appelant (boucle de messages Windows).
+/// Renvoie `true` quand l'icône a été retirée pour fermer l'appli, `false` si elle n'a pas pu être créée.
 #[cfg(windows)]
-pub fn run_tray(settings_url: String, fr: bool, on_quit: impl Fn() + Send + Sync + 'static) {
+pub fn run_tray(settings_url: String, fr: bool, on_quit: impl Fn() + Send + Sync + 'static) -> bool {
     use tray_icon::menu::{Menu, MenuEvent, MenuItem};
     use tray_icon::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
     use windows_sys::Win32::UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG};
 
     let icon = match decode_icon() {
         Some(i) => i,
-        None => return log::error!("Icône de notification indisponible : image illisible"),
+        None => {
+            log::error!("Icône de notification indisponible : image illisible");
+            return false;
+        }
     };
     let menu = Menu::new();
     let open_item = MenuItem::new(if fr { "Ouvrir les réglages" } else { "Open settings" }, true, None);
     let quit_item = MenuItem::new(if fr { "Quitter" } else { "Quit" }, true, None);
     if menu.append(&open_item).and_then(|_| menu.append(&quit_item)).is_err() {
-        return log::error!("Icône de notification indisponible : menu");
+        log::error!("Icône de notification indisponible : menu");
+        return false;
     }
     let tray = TrayIconBuilder::new()
         .with_tooltip("Voice Overlay - Caillou feat Claude")
@@ -81,10 +115,14 @@ pub fn run_tray(settings_url: String, fr: bool, on_quit: impl Fn() + Send + Sync
         .with_menu(Box::new(menu))
         .with_menu_on_left_click(false)
         .build();
-    let _tray = match tray {
+    let tray = match tray {
         Ok(t) => t,
-        Err(e) => return log::error!("Icône de notification indisponible : {e}"),
+        Err(e) => {
+            log::error!("Icône de notification indisponible : {e}");
+            return false;
+        }
     };
+    TRAY_THREAD.store(unsafe { windows_sys::Win32::System::Threading::GetCurrentThreadId() }, std::sync::atomic::Ordering::SeqCst);
     let (open_id, quit_id) = (open_item.id().clone(), quit_item.id().clone());
     let url = settings_url.clone();
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
@@ -107,6 +145,9 @@ pub fn run_tray(settings_url: String, fr: bool, on_quit: impl Fn() + Send + Sync
             DispatchMessageW(&msg);
         }
     }
+    // Retire l'icône de la barre des tâches avant de fermer.
+    drop(tray);
+    true
 }
 
 #[cfg(windows)]

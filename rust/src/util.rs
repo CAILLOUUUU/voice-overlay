@@ -56,6 +56,14 @@ pub fn is_discord_id(s: &str) -> bool {
 // Le .exe n'a pas de fenêtre : on écrit dans voice-overlay.log, avec rotation (un fichier .old).
 
 const LOG_MAX: u64 = 1_000_000;
+const RECENT_MAX: usize = 150;
+
+/// Dernières lignes du journal, gardées en mémoire pour « Copier le diagnostic ».
+static RECENT: Mutex<std::collections::VecDeque<String>> = Mutex::new(std::collections::VecDeque::new());
+
+pub fn recent_log() -> Vec<String> {
+    RECENT.lock().map(|r| r.iter().cloned().collect()).unwrap_or_default()
+}
 
 struct FileLogger {
     path: Option<PathBuf>,
@@ -76,6 +84,12 @@ impl log::Log for FileLogger {
             _ => "",
         };
         let line = format!("[{}] {}{}\n", chrono::Local::now().format("%H:%M:%S"), tag, record.args());
+        if let Ok(mut r) = RECENT.lock() {
+            if r.len() >= RECENT_MAX {
+                r.pop_front();
+            }
+            r.push_back(line.trim_end().to_string());
+        }
         let _g = self.lock.lock();
         match &self.path {
             None => eprint!("{line}"),

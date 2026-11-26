@@ -1,5 +1,12 @@
 # Tests + fabrication du .exe Windows (version Rust).
-# Sur un tag « v1.2.3 », le .exe est joint à la release GitHub.
+# Sur un tag « v1.2.3 », le .exe est joint à la release GitHub
+# (GitHub calcule alors son empreinte SHA-256, que l'appli vérifie avant de se mettre à jour).
+#
+# Signature du .exe (optionnelle) avec SignPath, gratuit pour les projets open source :
+#   - variable du dépôt  SIGNPATH_ORGANIZATION_ID  (Settings → Secrets and variables → Actions → Variables)
+#   - secret du dépôt    SIGNPATH_API_TOKEN
+#   - dans SignPath : un projet « voice-overlay » avec une règle de signature « release-signing »
+# Sans ces réglages, le .exe est publié sans signature, comme avant.
 name: rust
 on:
   push:
@@ -31,10 +38,41 @@ jobs:
         run: |
           v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           mkdir -p ../dist && cp target/release/voice-overlay.exe "../dist/Voice-Overlay-$v.exe"
-      - uses: actions/upload-artifact@v4
+      - id: unsigned
+        uses: actions/upload-artifact@v4
         with:
           name: voice-overlay-windows
           path: dist/*.exe
+
+      # ---------- Signature (seulement si SignPath est configuré) ----------
+      - id: sign
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: voice-overlay
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist-signed
+      - name: Vérifie la signature
+        if: steps.sign.outcome == 'success'
+        shell: pwsh
+        working-directory: dist-signed
+        run: |
+          Get-ChildItem *.exe | ForEach-Object {
+            $s = Get-AuthenticodeSignature $_.FullName
+            "$($_.Name) : $($s.Status) ($($s.SignerCertificate.Subject))"
+            if ($s.Status -ne 'Valid') { exit 1 }
+          }
+          Copy-Item *.exe ../dist/ -Force
+      - if: steps.sign.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-overlay-windows-signed
+          path: dist/*.exe
+
       - if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
