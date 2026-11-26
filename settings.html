@@ -15,8 +15,40 @@
   #status { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13px; }
   #dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
   .spacer { flex: 1; }
-  main { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; gap: 24px; padding: 24px; max-width: 1300px; margin: 0 auto; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  html { scrollbar-color: #3a3d46 var(--bg); accent-color: var(--accent); }
+  .row > span { min-width: 0; }
+  #dataPath { overflow-wrap: anywhere; }
+  ::selection { background: rgba(139, 108, 255, .4); color: #fff; }
+  main { display: grid; grid-template-columns: minmax(340px, 480px) 1fr; gap: 28px; padding: 0 24px 24px; max-width: 1360px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } #previewBox { position: static !important; } #stage { height: 380px !important; } }
+  /* Onglets du panneau de gauche */
+  .ptabs { position: sticky; top: 0; z-index: 3; display: flex; gap: 2px; background: var(--bg); border-bottom: 1px solid var(--line); margin-bottom: 18px; padding-top: 12px; }
+  .ptabs button { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+                  color: var(--dim); font-weight: 600; padding: 10px 14px 9px; margin-bottom: -1px; transition: color .15s, border-color .15s; }
+  .ptabs button:hover { color: var(--text); filter: none; }
+  .ptabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); }
+  .ptabs .count { min-width: 20px; padding: 0 6px; border-radius: 99px; background: #2b2d36; color: var(--text); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+  .ptabs .count.live { background: var(--ok); color: #08130c; }
+  .lead { margin: -4px 0 12px; }
+  .hint { margin-top: 8px; }
+  .empty { color: var(--dim); margin: 6px 0; padding: 18px; border: 1px dashed var(--line); border-radius: 8px; text-align: center; }
+  #leagueInfo { margin-bottom: 10px; }
+  #leagueInfo:empty { display: none; }
+  #peopleFoot { margin-top: 10px; }
+  details.more { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0 18px; margin-bottom: 16px; }
+  details.more > summary { cursor: pointer; padding: 13px 0; color: var(--dim); font-weight: 600; font-size: 13px; list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more > summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+  details.more[open] > summary::before { transform: rotate(45deg); }
+  details.more > summary:hover { color: var(--text); }
+  details.more[open] { padding-bottom: 14px; }
+  .endrow { margin-top: 4px; }
+  button.danger:hover, button.confirm { border-color: var(--bad) !important; color: var(--bad) !important; }
+  .profbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 0 10px; }
+  .profbar .lbl { color: var(--dim); font-size: 13px; }
+  .profbar .tabs { margin: 0; }
+  #previewBox .bar { margin: 10px 0 0; }
+  .person .handle svg { width: 12px; height: 14px; fill: currentColor; display: block; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 0 0 12px; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 0; }
@@ -45,8 +77,8 @@
   .err { color: var(--bad); min-height: 1.2em; margin: 6px 0 0; }
   .url { display: flex; gap: 8px; }
   .url input { font-family: Consolas, monospace; font-size: 12.5px; }
-  #previewBox { position: sticky; top: 24px; align-self: start; }
-  #stage { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; height: 520px; background: #3a4654; }
+  #previewBox { position: sticky; top: 0; align-self: start; }
+  #stage { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; height: min(560px, calc(100vh - 190px)); min-height: 320px; background: #3a4654; }
   #stage.bg-dark { background: #101114; }
   #stage.bg-light { background: #d9dce3; }
   #stage.bg-green { background: #00b140; }
@@ -99,7 +131,6 @@
   .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
   .tabs button.add { color: var(--dim); border-style: dashed; }
   .sub { display: block; margin: 12px 0 6px; }
-  #profDel.confirm { border-color: var(--bad); color: var(--bad); }
   [hidden] { display: none !important; }
   #updateBar { background: #2a2350; border-bottom: 1px solid var(--accent); padding: 9px 24px; font-size: 14px; }
   #updateBar a { font-weight: 700; margin-left: 8px; }
@@ -139,8 +170,6 @@
   <div id="status"><span id="dot"></span><span id="statusText">…</span></div>
   <span class="spacer"></span>
   <select id="langSel" aria-label="Langue / Language"><option value="fr">Français</option><option value="en">English</option></select>
-  <button class="ghost" id="credBtn" data-t="credBtn"></button>
-  <button class="ghost" id="resetBtn" data-t="resetBtn"></button>
 </header>
 <div id="updateBar" hidden><span id="updateText"></span><a id="updateLink" target="_blank" rel="noopener" data-t="download"></a><button id="updateInstall" data-t="updInstall" hidden></button><span id="updateState"></span></div>
 
@@ -183,88 +212,107 @@
 </div>
 
 <main>
-  <div>
-    <section>
-      <h2 data-t="profTitle"></h2>
-      <p class="muted" style="margin-bottom:12px" data-t="profHelp"></p>
-      <div class="tabs" id="profTabs"></div>
-      <label class="sub" for="profName" data-t="profName"></label>
-      <input type="text" id="profName" maxlength="40" autocomplete="off">
-      <span class="sub" data-t="obsTitle"></span>
-      <div class="url"><input type="text" id="obsUrl" readonly aria-label="OBS"><button id="copyBtn" data-copy="" data-t="copy"></button></div>
-      <div class="row"><small data-t="obsHelp"></small></div>
-      <div class="row"><span><span data-t="obsAutoLabel"></span><small data-t="obsAutoHelp"></small></span><button class="ghost" id="obsOpen" data-t="obsOpen"></button></div>
-      <div id="obsBox" class="obsbox" hidden>
-        <label class="sub" for="obsPass" data-t="obsPass"></label>
-        <div class="url"><input type="password" id="obsPass" autocomplete="off" data-tp="obsPassPh"><button id="obsConnect" data-t="obsConnect"></button></div>
-        <div id="obsScenes" hidden>
-          <label class="sub" for="obsScene" data-t="obsScene"></label>
-          <div class="url"><select id="obsScene"></select><button id="obsAdd" data-t="obsAdd"></button></div>
+  <div id="panel">
+    <nav class="ptabs" role="tablist" id="ptabs">
+      <button role="tab" id="tab-people" aria-controls="pane-people" data-pane="people"><span data-t="tabPeople"></span><span class="count" id="peopleCount" hidden></span></button>
+      <button role="tab" id="tab-style" aria-controls="pane-style" data-pane="style" data-t="tabStyle"></button>
+      <button role="tab" id="tab-obs" aria-controls="pane-obs" data-pane="obs" data-t="tabObs"></button>
+      <button role="tab" id="tab-app" aria-controls="pane-app" data-pane="app" data-t="tabApp"></button>
+    </nav>
+
+    <div class="pane" id="pane-people" role="tabpanel" aria-labelledby="tab-people">
+      <section>
+        <p class="muted" id="leagueInfo"></p>
+        <p class="empty" id="peopleEmpty" data-t="peopleEmpty"></p>
+        <div id="people"></div>
+        <p class="muted" id="peopleFoot" hidden data-t="peopleHelp"></p>
+      </section>
+      <details class="more">
+        <summary data-t="peopleMore"></summary>
+        <div class="row"><span><label for="forgetSel" data-t="forgetLabel"></label><small data-t="forgetHelp"></small></span>
+          <select id="forgetSel">
+            <option value="0" data-t="forget0"></option><option value="2" data-t="forget2"></option>
+            <option value="10" data-t="forget10"></option><option value="60" data-t="forget60"></option>
+            <option value="-1" data-t="forgetNever"></option>
+          </select></div>
+        <div class="btnrow"><button class="ghost danger" id="peopleReset" data-t="peopleReset"></button>
+          <button class="ghost" id="linksReset"></button></div>
+      </details>
+    </div>
+
+    <div class="pane" id="pane-style" role="tabpanel" aria-labelledby="tab-style" hidden>
+      <section>
+        <h2 data-t="presetTitle"></h2>
+        <p class="muted lead" data-t="presetHelp"></p>
+        <div class="presets" id="presets"></div>
+        <div class="btnrow" style="margin-top:10px"><button class="ghost" id="presetUndo" data-t="presetUndo" hidden></button></div>
+      </section>
+      <div id="form"></div>
+      <details class="more">
+        <summary data-t="styleShare"></summary>
+        <p class="muted lead" data-t="styleShareHelp"></p>
+        <div class="btnrow">
+          <button class="ghost" id="exportBtn" data-t="exportBtn"></button>
+          <button class="ghost" id="importBtn" data-t="importBtn"></button>
+          <input type="file" id="importPicker" accept=".json" hidden>
         </div>
-        <p class="err" id="obsMsg"></p>
-      </div>
-      <div class="row" id="profDelRow"><span></span><button class="ghost" id="profDel" data-t="profDel"></button></div>
-    </section>
+        <p class="err" id="importMsg"></p>
+      </details>
+      <div class="row endrow"><span><span data-t="resetLabel"></span><small data-t="resetHelp"></small></span><button class="ghost danger" id="resetBtn" data-t="resetBtn"></button></div>
+    </div>
 
-    <section>
-      <h2 data-t="peopleTitle"></h2>
-      <p class="muted" id="peopleEmpty" data-t="peopleEmpty"></p>
-      <p class="muted" id="leagueInfo" style="margin-bottom:10px"></p>
-      <div id="people"></div>
-      <div id="peopleFoot" hidden>
-        <p class="muted" style="margin:8px 0" data-t="peopleHelp"></p>
-        <div class="btnrow"><button class="ghost" id="peopleReset" data-t="peopleReset"></button>
-        <button class="ghost" id="linksReset"></button></div>
-      </div>
-      <div class="row"><span><label for="forgetSel" data-t="forgetLabel"></label><small data-t="forgetHelp"></small></span>
-        <select id="forgetSel">
-          <option value="0" data-t="forget0"></option><option value="2" data-t="forget2"></option>
-          <option value="10" data-t="forget10"></option><option value="60" data-t="forget60"></option>
-          <option value="-1" data-t="forgetNever"></option>
-        </select></div>
-    </section>
+    <div class="pane" id="pane-obs" role="tabpanel" aria-labelledby="tab-obs" hidden>
+      <section>
+        <h2 data-t="obsTitle"></h2>
+        <div class="url"><input type="text" id="obsUrl" readonly aria-label="OBS"><button id="copyBtn" data-copy="" data-t="copy"></button></div>
+        <p class="muted hint" data-t="obsHelp"></p>
+      </section>
+      <section>
+        <h2 data-t="obsAutoLabel"></h2>
+        <p class="muted lead" data-t="obsAutoHelp"></p>
+        <div id="obsBox">
+          <label class="sub" for="obsPass" data-t="obsPass"></label>
+          <div class="url"><input type="password" id="obsPass" autocomplete="off" data-tp="obsPassPh"><button id="obsConnect" data-t="obsConnect"></button></div>
+          <div id="obsScenes" hidden>
+            <label class="sub" for="obsScene" data-t="obsScene"></label>
+            <div class="url"><select id="obsScene"></select><button id="obsAdd" data-t="obsAdd"></button></div>
+          </div>
+          <p class="err" id="obsMsg"></p>
+        </div>
+      </section>
+      <section>
+        <h2 data-t="profTitle"></h2>
+        <p class="muted lead" data-t="profHelp"></p>
+        <label class="sub" for="profName" data-t="profName"></label>
+        <input type="text" id="profName" maxlength="40" autocomplete="off">
+        <div class="row endrow" id="profDelRow"><span></span><button class="ghost" id="profDel" data-t="profDel"></button></div>
+      </section>
+    </div>
 
-    <section>
-      <h2 data-t="presetTitle"></h2>
-      <p class="muted" style="margin-bottom:10px" data-t="presetHelp"></p>
-      <div class="presets" id="presets"></div>
-      <div class="btnrow" style="margin-top:10px"><button class="ghost" id="presetUndo" data-t="presetUndo" hidden></button></div>
-    </section>
-
-    <div id="form"></div>
-
-    <section>
-      <h2 data-t="styleShare"></h2>
-      <p class="muted" style="margin-bottom:10px" data-t="styleShareHelp"></p>
-      <div class="btnrow">
-        <button class="ghost" id="exportBtn" data-t="exportBtn"></button>
-        <button class="ghost" id="importBtn" data-t="importBtn"></button>
-        <input type="file" id="importPicker" accept=".json" hidden>
-      </div>
-      <p class="err" id="importMsg"></p>
-    </section>
-
-    <section>
-      <h2 data-t="appTitle"></h2>
-      <div class="row" id="autoRow" hidden><span><label for="autostart" data-t="autostart"></label><small data-t="autostartHelp"></small></span><input type="checkbox" id="autostart"></div>
-      <div class="row" id="dataRow" hidden><span><span data-t="dataLabel"></span><small id="dataPath"></small></span><button class="ghost" id="dataBtn" data-t="dataBtn"></button></div>
-      <div id="diagRow" hidden>
-        <div class="row"><span><span data-t="diagLabel"></span><small data-t="diagHelp"></small></span><button class="ghost" id="diagBtn" data-t="diagBtn"></button></div>
-        <p class="ok-msg muted" id="diagMsg" hidden></p>
-        <textarea id="diagText" readonly hidden spellcheck="false"></textarea>
-      </div>
-      <div class="row"><span><span data-t="quitLabel"></span><small data-t="quitHelp"></small></span><button class="ghost" id="quitBtn" data-t="quit"></button></div>
-    </section>
+    <div class="pane" id="pane-app" role="tabpanel" aria-labelledby="tab-app" hidden>
+      <section>
+        <div class="row"><span><span data-t="credLabel"></span><small data-t="credHelp"></small></span><button class="ghost" id="credBtn" data-t="credBtn"></button></div>
+        <div class="row" id="autoRow" hidden><span><label for="autostart" data-t="autostart"></label><small data-t="autostartHelp"></small></span><input type="checkbox" id="autostart"></div>
+        <div class="row" id="dataRow" hidden><span><span data-t="dataLabel"></span><small id="dataPath"></small></span><button class="ghost" id="dataBtn" data-t="dataBtn"></button></div>
+        <div id="diagRow" hidden>
+          <div class="row"><span><span data-t="diagLabel"></span><small data-t="diagHelp"></small></span><button class="ghost" id="diagBtn" data-t="diagBtn"></button></div>
+          <p class="ok-msg muted" id="diagMsg" hidden></p>
+          <textarea id="diagText" readonly hidden spellcheck="false"></textarea>
+        </div>
+        <div class="row"><span><span data-t="quitLabel"></span><small data-t="quitHelp"></small></span><button class="ghost danger" id="quitBtn" data-t="quit"></button></div>
+      </section>
+    </div>
   </div>
 
   <div id="previewBox">
+    <div class="profbar"><span class="lbl" data-t="profileLabel"></span><div class="tabs" id="profTabs"></div></div>
+    <div id="stage"><iframe src="about:blank" title="Preview"></iframe></div>
     <div class="bar"><span data-t="preview"></span>
       <button class="ghost" data-bg="" data-t="bgGame"></button>
       <button class="ghost" data-bg="bg-dark" data-t="bgDark"></button>
       <button class="ghost" data-bg="bg-light" data-t="bgLight"></button>
       <button class="ghost" data-bg="bg-green" data-t="bgGreen"></button>
     </div>
-    <div id="stage"><iframe src="about:blank" title="Preview"></iframe></div>
   </div>
 </main>
 <footer><span id="ver"></span> · <a href="/licences" target="_blank" data-t="licences"></a></footer>
@@ -281,7 +329,11 @@
   // ---------- Textes (français / anglais) ----------
   const L = {
     fr: {
-      credBtn: 'Identifiants Discord', resetBtn: 'Réinitialiser le style', download: 'Télécharger', copy: 'Copier', copied: 'Copié ✓',
+      tabPeople: 'Personnes', tabStyle: 'Style', tabObs: 'Profil et OBS', tabApp: 'Application',
+      profileLabel: 'Profil :', peopleMore: 'Options et remise à zéro',
+      resetBtn: 'Réinitialiser', resetLabel: 'Revenir au style de départ', resetHelp: 'Remet tous les réglages de ce profil par défaut.', resetConfirm: 'Clique encore pour réinitialiser',
+      credLabel: 'Connexion à Discord', credHelp: 'Change le Client ID ou le Client Secret, ou refais l\'assistant.', credBtn: 'Identifiants Discord',
+      download: 'Télécharger', copy: 'Copier', copied: 'Copié ✓',
       back: 'Retour', retry: 'Réessayer', fixCodes: 'Corriger mes codes', quit: 'Quitter', stopped: 'Arrêté',
       updateText: v => `La version ${v} est disponible.`,
       wzHead: 'On relie l\'overlay à ton Discord', wzSub: '4 étapes, environ 2 minutes. À faire une seule fois.',
@@ -322,12 +374,12 @@
         auth: 'Clique sur « Autoriser » dans la fenêtre Discord', demo: 'Mode démo (faux membres)', closed: 'L\'application est fermée : relance-la',
         connected: (u, ch, n) => `Connecté en tant que ${u}` + (ch ? ` · dans « ${ch} » (${n})` : ' · dans aucun vocal'),
       },
-      obsTitle: 'Lien OBS de ce profil', obsHelp: 'Source → Navigateur, largeur 400 et hauteur 600 pour commencer. Les réglages s\'appliquent en direct, sans toucher à OBS.',
-      profTitle: 'Profils d\'overlay', profHelp: 'Chaque profil a son propre style et son propre lien OBS. Mets-en un par scène (par exemple vertical en jeu, horizontal ailleurs) : ils marchent tous en même temps. Les réglages plus bas s\'appliquent au profil sélectionné.',
+      obsTitle: 'Lien OBS de ce profil', obsHelp: 'Source → Navigateur, 400 × 600 pour commencer. Les réglages s\'appliquent en direct.',
+      profTitle: 'Profils d\'overlay', profHelp: 'Chaque profil a son style et son lien OBS : un par scène, ils marchent tous en même temps. Choisis le profil à modifier au-dessus de l\'aperçu.',
       profName: 'Nom du profil', profNew: '＋ Nouveau profil', profDel: 'Supprimer ce profil', profDelConfirm: 'Clique encore pour supprimer',
       newProfile: n => `Profil ${n}`,
-      peopleTitle: 'Renommer les utilisateurs', peopleEmpty: 'Rejoins un salon vocal : les personnes présentes apparaîtront ici.',
-      peopleHelp: 'Renomme, réordonne ou masque qui tu veux. Tes changements restent même si Discord plante ou si quelqu\'un se reconnecte.',
+      peopleTitle: 'Personnes', peopleEmpty: 'Rejoins un salon vocal : les personnes présentes apparaîtront ici.',
+      peopleHelp: 'Tes changements restent même si Discord plante ou si quelqu\'un se reconnecte.',
       forgetLabel: 'Oublier les changements d\'une personne partie depuis', forgetHelp: 'Si elle revient avant, elle retrouve son nom et sa place.',
       forget0: 'Tout de suite', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 heure', forgetNever: 'Jamais',
       roleAuto: r => r ? `Auto · ${r}` : 'Auto', roleNames: { top: 'Top', jungle: 'Jungle', mid: 'Mid', adc: 'ADC', support: 'Support' },
@@ -338,7 +390,7 @@
       leagueOn: 'Client League détecté : les rôles se remplissent seuls quand le pseudo League ressemble au pseudo Discord.',
       leagueGame: 'Partie League en cours : rôles lus depuis le jeu.',
       peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
-      styleShare: 'Partager ton style', styleShareHelp: 'Enregistre ton style dans un fichier pour le garder ou l\'envoyer à quelqu\'un, ou charge celui d\'un autre.',
+      styleShare: 'Partager ton style', styleShareHelp: 'Garde ton style dans un fichier, envoie-le à quelqu\'un, ou charge celui d\'un autre.',
       exportBtn: 'Exporter mon style', importBtn: 'Importer un style', importOk: 'Style importé.', importBad: 'Ce fichier n\'est pas un style Voice Overlay.',
       appTitle: 'Application', autostart: 'Lancer avec Windows', autostartHelp: 'Démarre en arrière-plan, sans ouvrir cette page.',
       dataLabel: 'Dossier des données', dataBtn: 'Ouvrir',
@@ -361,7 +413,7 @@
       updInstall: 'Installer maintenant', updDownloading: 'Téléchargement…', updRestarting: 'Installation, l\'appli redémarre…',
       updError: e => `La mise à jour a échoué : ${e || 'erreur inconnue'}. Utilise le lien de téléchargement.`,
       drag: 'Glisser pour changer l\'ordre (ou flèches haut/bas du clavier)', dragLocked: 'Rangé automatiquement selon son rôle',
-      presetTitle: 'Styles prêts à l\'emploi', presetHelp: 'Clique sur un style pour l\'appliquer au profil sélectionné : l\'aperçu change tout de suite. Tes options d\'affichage (titre, qui afficher, CSS) ne bougent pas.',
+      presetTitle: 'Styles prêts à l\'emploi', presetHelp: 'S\'applique au profil sélectionné. Ton titre, tes options d\'affichage et ton CSS ne bougent pas.',
       presetUndo: '↶ Annuler le style', presetNames: { classic: 'Discord', neon: 'Néon', minimal: 'Minimal', esport: 'Esport rouge', light: 'Clair', comic: 'BD', bar: 'Barre horizontale', hextech: 'Hextech' },
       diagLabel: 'Diagnostic', diagHelp: 'Copie un rapport à envoyer si quelque chose ne marche pas. Il contient les noms des personnes du vocal, mais aucun mot de passe ni code Discord.',
       diagBtn: 'Copier le diagnostic', diagCopied: 'Copié ✓ Colle-le dans ton message (Ctrl+V).', diagShown: 'Sélectionne le texte ci-dessous et copie-le (Ctrl+C).',
@@ -375,7 +427,11 @@
       obsFail: e => `OBS a refusé : ${e}`,
     },
     en: {
-      credBtn: 'Discord credentials', resetBtn: 'Reset style', download: 'Download', copy: 'Copy', copied: 'Copied ✓',
+      tabPeople: 'People', tabStyle: 'Style', tabObs: 'Profile & OBS', tabApp: 'App',
+      profileLabel: 'Profile:', peopleMore: 'Options and reset',
+      resetBtn: 'Reset', resetLabel: 'Back to the default style', resetHelp: 'Resets every setting of this profile.', resetConfirm: 'Click again to reset',
+      credLabel: 'Discord connection', credHelp: 'Change the Client ID or Client Secret, or redo the setup.', credBtn: 'Discord credentials',
+      download: 'Download', copy: 'Copy', copied: 'Copied ✓',
       back: 'Back', retry: 'Try again', fixCodes: 'Fix my codes', quit: 'Quit', stopped: 'Stopped',
       updateText: v => `Version ${v} is available.`,
       wzHead: 'Let\'s link the overlay to your Discord', wzSub: '4 steps, about 2 minutes. You only do this once.',
@@ -416,12 +472,12 @@
         auth: 'Click "Authorize" in the Discord window', demo: 'Demo mode (fake members)', closed: 'The app is closed: start it again',
         connected: (u, ch, n) => `Connected as ${u}` + (ch ? ` · in "${ch}" (${n})` : ' · not in a voice channel'),
       },
-      obsTitle: 'OBS link for this profile', obsHelp: 'Source → Browser, width 400 and height 600 to start. Settings apply live, no need to touch OBS.',
-      profTitle: 'Overlay profiles', profHelp: 'Each profile has its own style and its own OBS link. Use one per scene (for example vertical in game, horizontal elsewhere): they all work at the same time. The settings below apply to the selected profile.',
+      obsTitle: 'OBS link for this profile', obsHelp: 'Source → Browser, 400 × 600 to start. Settings apply live.',
+      profTitle: 'Overlay profiles', profHelp: 'Each profile has its own style and OBS link: one per scene, they all work at the same time. Pick the profile to edit above the preview.',
       profName: 'Profile name', profNew: '＋ New profile', profDel: 'Delete this profile', profDelConfirm: 'Click again to delete',
       newProfile: n => `Profile ${n}`,
-      peopleTitle: 'Rename users', peopleEmpty: 'Join a voice channel: the people in it will show up here.',
-      peopleHelp: 'Rename, reorder or hide anyone. Your changes stay even if Discord crashes or someone reconnects.',
+      peopleTitle: 'People', peopleEmpty: 'Join a voice channel: the people in it will show up here.',
+      peopleHelp: 'Your changes stay even if Discord crashes or someone reconnects.',
       forgetLabel: 'Forget a person\'s changes once they\'ve been gone for', forgetHelp: 'If they come back before that, they get their name and spot back.',
       forget0: 'Right away', forget2: '2 minutes', forget10: '10 minutes', forget60: '1 hour', forgetNever: 'Never',
       roleAuto: r => r ? `Auto · ${r}` : 'Auto', roleNames: { top: 'Top', jungle: 'Jungle', mid: 'Mid', adc: 'ADC', support: 'Support' },
@@ -432,7 +488,7 @@
       leagueOn: 'League client detected: roles fill in by themselves when the League name looks like the Discord name.',
       leagueGame: 'League game in progress: roles read from the game.',
       peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
-      styleShare: 'Share your style', styleShareHelp: 'Save your style to a file to keep it or send it to someone, or load someone else\'s.',
+      styleShare: 'Share your style', styleShareHelp: 'Save your style to a file, send it to someone, or load someone else\'s.',
       exportBtn: 'Export my style', importBtn: 'Import a style', importOk: 'Style imported.', importBad: 'This file is not a Voice Overlay style.',
       appTitle: 'Application', autostart: 'Start with Windows', autostartHelp: 'Starts in the background, without opening this page.',
       dataLabel: 'Data folder', dataBtn: 'Open',
@@ -455,7 +511,7 @@
       updInstall: 'Install now', updDownloading: 'Downloading…', updRestarting: 'Installing, the app is restarting…',
       updError: e => `The update failed: ${e || 'unknown error'}. Use the download link.`,
       drag: 'Drag to reorder (or use the up/down arrow keys)', dragLocked: 'Sorted automatically by role',
-      presetTitle: 'Ready-made styles', presetHelp: 'Click a style to apply it to the selected profile: the preview changes right away. Your display options (title, who to show, CSS) stay as they are.',
+      presetTitle: 'Ready-made styles', presetHelp: 'Applies to the selected profile. Your title, display options and CSS stay as they are.',
       presetUndo: '↶ Undo style', presetNames: { classic: 'Discord', neon: 'Neon', minimal: 'Minimal', esport: 'Esport red', light: 'Light', comic: 'Comic', bar: 'Horizontal bar', hextech: 'Hextech' },
       diagLabel: 'Diagnostics', diagHelp: 'Copies a report to send if something doesn\'t work. It includes the names of people in your voice channel, but no passwords or Discord codes.',
       diagBtn: 'Copy diagnostics', diagCopied: 'Copied ✓ Paste it in your message (Ctrl+V).', diagShown: 'Select the text below and copy it (Ctrl+C).',
@@ -822,6 +878,46 @@
     }
   }
 
+  // ---------- Onglets ----------
+  const PANES = ['people', 'style', 'obs', 'app'];
+  function showPane(name, focus) {
+    if (!PANES.includes(name)) name = 'people';
+    for (const n of PANES) {
+      const on = n === name;
+      $('pane-' + n).hidden = !on;
+      const t = $('tab-' + n);
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    }
+    try { localStorage.setItem('voPane', name); } catch {}
+  }
+  function bindTabs() {
+    for (const t of document.querySelectorAll('#ptabs [role=tab]')) {
+      t.onclick = () => showPane(t.dataset.pane);
+      t.onkeydown = e => {
+        const i = PANES.indexOf(t.dataset.pane);
+        const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: PANES.length - 1 }[e.key];
+        if (j === undefined) return;
+        e.preventDefault();
+        showPane(PANES[(j + PANES.length) % PANES.length], true);
+      };
+    }
+    let saved = null;
+    try { saved = localStorage.getItem('voPane'); } catch {}
+    showPane(saved || 'people');
+  }
+  // Bouton à double clic pour les actions qu'on ne peut pas annuler.
+  function confirmTwice(btn, label, confirmLabel, action) {
+    let armed = false, t;
+    const reset = () => { armed = false; clearTimeout(t); btn.textContent = label(); btn.classList.remove('confirm'); };
+    btn.onclick = () => {
+      if (!armed) { armed = true; btn.textContent = confirmLabel(); btn.classList.add('confirm'); t = setTimeout(reset, 4000); return; }
+      reset();
+      action();
+    };
+  }
+
   // ---------- Diagnostic ----------
   async function copyDiagnostics() {
     const text = await (await fetch('/api/diagnostics')).text();
@@ -920,6 +1016,9 @@
     $('linksReset').textContent = S.linksReset(d.links || 0);
     $('linksReset').hidden = !d.links;
     $('peopleEmpty').hidden = ms.length > 0;
+    $('peopleCount').hidden = ms.length === 0;
+    $('peopleCount').textContent = ms.length;
+    $('peopleCount').classList.toggle('live', ms.some(m => m.speaking));
     $('peopleFoot').hidden = ms.length === 0;
     const key = ms.map(m => m.id).join(',');
     peopleIds = ms.map(m => m.id);
@@ -936,7 +1035,8 @@
         name.setAttribute('aria-label', S.shownName);
         let t;
         name.oninput = () => { clearTimeout(t); t = setTimeout(() => post('/api/person', { id: m.id, name: name.value }), 150); };
-        const handle = el('button', { className: 'ghost handle', textContent: '⠿', type: 'button' });
+        const handle = el('button', { className: 'ghost handle', type: 'button' });
+        handle.innerHTML = '<svg viewBox="0 0 12 14" aria-hidden="true"><circle cx="3" cy="2.5" r="1.5"/><circle cx="9" cy="2.5" r="1.5"/><circle cx="3" cy="7" r="1.5"/><circle cx="9" cy="7" r="1.5"/><circle cx="3" cy="11.5" r="1.5"/><circle cx="9" cy="11.5" r="1.5"/></svg>';
         handle.dataset.hid = m.id;
         const hide = el('input', { type: 'checkbox' });
         hide.onchange = () => post('/api/person', { id: m.id, hidden: hide.checked });
@@ -1051,7 +1151,7 @@
     };
     for (const b of document.querySelectorAll('[data-bg]')) b.onclick = () => ($('stage').className = b.dataset.bg);
 
-    $('peopleReset').onclick = () => post('/api/people-reset');
+    confirmTwice($('peopleReset'), () => S.peopleReset, () => S.resetConfirm, () => post('/api/people-reset'));
     $('linksReset').onclick = () => post('/api/dpm-forget', {});
     $('forgetSel').onchange = () => post('/api/people-forget', { minutes: Number($('forgetSel').value) });
     $('dataBtn').onclick = () => post('/api/open-data');
@@ -1060,7 +1160,7 @@
       const j = await (await post('/api/autostart', { enabled: $('autostart').checked })).json();
       $('autostart').checked = !!j.autostart;
     };
-    $('resetBtn').onclick = () => { settings = curP().settings = { ...defaults }; buildForm(); save(); };
+    confirmTwice($('resetBtn'), () => S.resetBtn, () => S.resetConfirm, () => { settings = curP().settings = { ...defaults }; buildForm(); save(); });
     $('presetUndo').onclick = undoPreset;
     $('updateInstall').onclick = async () => {
       $('updateInstall').hidden = true;
@@ -1069,7 +1169,6 @@
       if (j.error) $('updateState').textContent = S.updError(msg(j.error));
     };
     $('diagBtn').onclick = copyDiagnostics;
-    $('obsOpen').onclick = () => { $('obsBox').hidden = !$('obsBox').hidden; if (!$('obsBox').hidden) $('obsPass').focus(); };
     $('obsConnect').onclick = obsStart;
     $('obsPass').onkeydown = e => { if (e.key === 'Enter') obsStart(); };
     $('obsAdd').onclick = obsAdd;
@@ -1139,6 +1238,7 @@
     $('diagRow').hidden = !(s.features || []).includes('diagnostics');
     try { $('obsPass').value = localStorage.getItem('voObsPass') || ''; } catch {}
     bind();
+    bindTabs();
     let last = null;
     try { last = localStorage.getItem('voProfile'); } catch {}
     selectProfile(last);

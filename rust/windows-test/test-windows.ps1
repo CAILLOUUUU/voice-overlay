@@ -287,11 +287,11 @@ if (-not $state) {
     Check 'Settings window uses WebView2' ($wv -gt 0) "$wv processes"
     Check 'WebView data kept in the app data folder' ((Test-Path (Join-Path $testData 'webview')) -and -not (Get-ChildItem $exe.DirectoryName -Filter '*.WebView2' -ErrorAction SilentlyContinue))
     Check 'Right-click shows the menu' (Ask 'Right-click the icon: do you see "Open settings" and "Quit"?')
-    Check 'Settings page looks normal' (Ask 'Does the settings window look like the usual settings page (no errors, preview visible)?')
+    Check 'Settings page looks normal' (Ask 'Does the settings window show the tabs People / Style / Profile & OBS / App, with the preview on the right and no errors?')
     Check 'Links open in your browser' (Ask 'At the very bottom of the settings window, click "Component licenses" (or "Licences des composants"). Does it open in your normal browser?')
     Check 'Clicking the icon again reuses the window' (Ask 'Left-click the tray icon again: does the SAME window come to the front (no second window)?')
-    Check 'Ready-made styles' (Ask 'In "Ready-made styles", click a style: does the preview on the right change?')
-    $r = AskOpt 'Under "Overlay profiles", click "Add to OBS..." and follow the help text (needs OBS open). Did the source appear in OBS?'
+    Check 'Ready-made styles' (Ask 'Open the "Style" tab and click a ready-made style: does the preview on the right change?')
+    $r = AskOpt 'Open the "Profile & OBS" tab, follow "Add to OBS automatically" (needs OBS open). Did the source appear in OBS?'
     if ($null -eq $r) { Note 'Add to OBS: skipped' } else { Check 'Add to OBS automatically' $r }
     $memOpen = [math]::Round((Get-Process -Id $proc.Id).WorkingSet64 / 1MB, 1)
     Read-Host 'Now CLOSE the settings window with its X, then press Enter'
