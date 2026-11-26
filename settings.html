@@ -822,7 +822,13 @@
     selectProfile(last);
 
     const es = new EventSource('/events');
-    es.onmessage = e => { const snap = JSON.parse(e.data); showStatus(snap); showPeople(snap); };
+    let lastSnap = null;
+    es.onmessage = e => { const snap = lastSnap = JSON.parse(e.data); showStatus(snap); showPeople(snap); };
+    es.addEventListener('speaking', e => {
+      if (!lastSnap) return;
+      const on = new Set(JSON.parse(e.data).speaking);
+      for (const m of lastSnap.members) { m.speaking = on.has(m.id); const r = rows.get(m.id); if (r) r.row.classList.toggle('speaking', m.speaking); }
+    });
     es.onerror = () => { $('statusText').textContent = S.status.closed; $('dot').style.background = 'var(--bad)'; };
   })();
 </script>
