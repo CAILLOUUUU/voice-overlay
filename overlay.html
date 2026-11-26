@@ -243,6 +243,7 @@
       let el = els.get(m.id);
       if (!el) {
         el = tpl.content.firstElementChild.cloneNode(true);
+        el.dataset.id = m.id;
         els.set(m.id, el);
       }
       const img = el.querySelector('.av');

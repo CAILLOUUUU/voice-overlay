@@ -287,7 +287,7 @@ if (-not $state) {
     Check 'Settings window uses WebView2' ($wv -gt 0) "$wv processes"
     Check 'WebView data kept in the app data folder' ((Test-Path (Join-Path $testData 'webview')) -and -not (Get-ChildItem $exe.DirectoryName -Filter '*.WebView2' -ErrorAction SilentlyContinue))
     Check 'Right-click shows the menu' (Ask 'Right-click the icon: do you see "Open settings" and "Quit"?')
-    Check 'Settings page looks normal' (Ask 'Does the settings window show the tabs People / Style / Profile & OBS / App, with the preview on the right and no errors?')
+    Check 'Settings page looks normal' (Ask 'Does the settings window show the new dark-blue DPM-style look, the tabs People / Style / Profile & OBS / App, and the preview on the right, with no errors?')
     Check 'Links open in your browser' (Ask 'At the very bottom of the settings window, click "Component licenses" (or "Licences des composants"). Does it open in your normal browser?')
     Check 'Clicking the icon again reuses the window' (Ask 'Left-click the tray icon again: does the SAME window come to the front (no second window)?')
     Check 'Ready-made styles' (Ask 'Open the "Style" tab and click a ready-made style: does the preview on the right change?')
