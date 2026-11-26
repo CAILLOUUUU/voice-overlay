@@ -61,6 +61,21 @@ node server.js --demo     # fake members, no Discord needed
 | `webfonts/` | Included fonts (OFL license) |
 | `build/` | Builds the `.exe` (`cd build && npm install && node build.js`) |
 
+### Rust version (`rust/`)
+
+The same program, rewritten in Rust: a ~3 MB `.exe` instead of bundling Node.js, a real tray icon (no more PowerShell script), and the Client Secret and Discord token stored in Windows Credential Manager instead of `config.json` and `token.json` (moved automatically on first launch). `overlay.html` and `settings.html` are unchanged and embedded in the `.exe`, and the addresses (`/events`, `/api/...`) are the same, so the Chrome extension works as is.
+
+```
+cd rust
+cargo run -- --demo --port=47474   # fake members, no Discord needed
+cargo test                         # tests (name matching, DPM links, Discord protocol…)
+cargo build --release              # .exe in rust/target/release (on Windows)
+```
+
+From macOS or Linux: `rustup target add x86_64-pc-windows-gnu`, install `mingw-w64`, then `cargo build --release --target x86_64-pc-windows-gnu`. The `.github/workflows/rust.yml` workflow builds the `.exe` on Windows and attaches it to the release for every `v*` tag.
+
+Useful options: `--port=N` (or `VO_PORT`), `--silent`, `VO_DATA_DIR` (other data folder), `VO_ASSETS_DIR=..` (reads the pages from disk, no rebuild), `VO_NO_KEYRING=1` (secrets in files), `VO_DEBUG=1` (detailed log). In `config.json`, `extensionIds` restricts the DPM bridge to specific extensions. The extension calls port 47474: if you change it, edit `extension/background.js` too.
+
 ## Credits
 
 Made by Caillou, built with Claude. Released under the [MIT License](LICENSE). Bundles Node.js and open fonts: see [LICENCES-TIERS.txt](LICENCES-TIERS.txt).

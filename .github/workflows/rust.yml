@@ -1,0 +1,41 @@
+# Tests + fabrication du .exe Windows (version Rust).
+# Sur un tag « v1.2.3 », le .exe est joint à la release GitHub.
+name: rust
+on:
+  push:
+    branches: [main, rust-port]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+        env:
+          VO_NO_KEYRING: '1'
+      - run: cargo build --release
+      - name: Nom du .exe
+        shell: bash
+        run: |
+          v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          mkdir -p ../dist && cp target/release/voice-overlay.exe "../dist/Voice-Overlay-$v.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-overlay-windows
+          path: dist/*.exe
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe

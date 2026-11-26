@@ -10,3 +10,6 @@ dist/
 build/.cache/
 build/node_modules/
 *.exe
+
+# Rust
+rust/target/
