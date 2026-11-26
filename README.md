@@ -76,7 +76,7 @@ cargo test                         # tests (ressemblance des pseudos, liens DPM,
 cargo build --release              # .exe dans rust/target/release (sous Windows)
 ```
 
-Depuis macOS ou Linux : `rustup target add x86_64-pc-windows-gnu`, installer `mingw-w64`, puis `cargo build --release --target x86_64-pc-windows-gnu`. Le workflow `.github/workflows/rust.yml` fabrique le `.exe` sous Windows et le joint à la release pour chaque tag `v*`.
+Depuis macOS ou Linux : `rustup target add x86_64-pc-windows-msvc`, `cargo install cargo-xwin`, installer `mingw-w64` (pour l'icône), puis `cargo xwin build --release --target x86_64-pc-windows-msvc`. N'utilise pas la cible `-gnu` : le `.exe` aurait besoin de `WebView2Loader.dll` à côté de lui. Le workflow `.github/workflows/rust.yml` fabrique le `.exe` sous Windows et le joint à la release pour chaque tag `v*`.
 
 Ce que la version Rust ajoute dans la page de réglages :
 
