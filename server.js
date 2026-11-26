@@ -885,7 +885,7 @@ class DiscordRPC {
     if (this.closeReason) {
       err = new Error(this.closeReason);
       err.msg = /client.?id/i.test(this.closeReason)
-        ? M('Discord ne reconnaît pas ce Client ID. Vérifie que tu l\'as bien copié.', 'Discord does not recognize this Client ID. Check that you copied it correctly.')
+        ? M('Discord ne reconnaît pas cet identifiant d\'application. Vérifie que tu l\'as bien copié.', 'Discord does not recognize this Client ID. Check that you copied it correctly.')
         : M(`Discord a refusé la connexion : ${this.closeReason}`, `Discord refused the connection: ${this.closeReason}`);
       err.code = 'BLOCKED';
     }
@@ -926,8 +926,8 @@ async function exchangeToken(params) {
   if (!r.ok) {
     const e = new Error(`token: ${j.error || r.status}`);
     e.msg = j.error === 'invalid_client'
-      ? M('Le Client Secret n\'est pas le bon. Refais « Reset Secret » sur le site Discord et colle le nouveau.', 'The Client Secret is wrong. Click "Reset Secret" on the Discord site again and paste the new one.')
-      : M(`Discord a refusé les codes (${j.error || r.status}). Vérifie le Client ID, le Client Secret et l'adresse http://localhost dans « Redirects ».`,
+      ? M('La clé secrète n\'est pas la bonne. Refais « Réinitialiser la clé secrète » sur le site Discord et colle la nouvelle.', 'The Client Secret is wrong. Click "Reset Secret" on the Discord site again and paste the new one.')
+      : M(`Discord a refusé les codes (${j.error || r.status}). Vérifie l'identifiant, la clé secrète et l'adresse http://localhost dans « Redirections ».`,
           `Discord rejected the codes (${j.error || r.status}). Check the Client ID, the Client Secret and the http://localhost address under "Redirects".`);
     e.code = 'BLOCKED';
     throw e;

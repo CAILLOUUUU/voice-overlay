@@ -229,7 +229,7 @@ fn closed_error(reason: Option<String>) -> Error {
         Some(r) => {
             let lower = r.to_lowercase();
             let msg = if lower.contains("client id") || lower.contains("client_id") || lower.contains("clientid") {
-                m("Discord ne reconnaît pas ce Client ID. Vérifie que tu l'as bien copié.", "Discord does not recognize this Client ID. Check that you copied it correctly.")
+                m("Discord ne reconnaît pas cet identifiant d'application. Vérifie que tu l'as bien copié.", "Discord does not recognize this Client ID. Check that you copied it correctly.")
             } else {
                 m(format!("Discord a refusé la connexion : {r}"), format!("Discord refused the connection: {r}"))
             };
@@ -259,10 +259,10 @@ async fn exchange_token(app: &App, params: &[(&str, &str)]) -> Result<Value, Err
     if !status.is_success() {
         let err = j.get("error").and_then(Value::as_str).map(String::from).unwrap_or_else(|| status.as_u16().to_string());
         let msg = if err == "invalid_client" {
-            m("Le Client Secret n'est pas le bon. Refais « Reset Secret » sur le site Discord et colle le nouveau.", "The Client Secret is wrong. Click \"Reset Secret\" on the Discord site again and paste the new one.")
+            m("La clé secrète n'est pas la bonne. Refais « Réinitialiser la clé secrète » sur le site Discord et colle la nouvelle.", "The Client Secret is wrong. Click \"Reset Secret\" on the Discord site again and paste the new one.")
         } else {
             m(
-                format!("Discord a refusé les codes ({err}). Vérifie le Client ID, le Client Secret et l'adresse http://localhost dans « Redirects »."),
+                format!("Discord a refusé les codes ({err}). Vérifie l'identifiant, la clé secrète et l'adresse http://localhost dans « Redirections »."),
                 format!("Discord rejected the codes ({err}). Check the Client ID, the Client Secret and the http://localhost address under \"Redirects\"."),
             )
         };

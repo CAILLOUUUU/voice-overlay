@@ -451,22 +451,23 @@
       w1Title: 'Étape 1 · Crée ton appli Discord',
       w1Why: 'Pour lire ton salon vocal, Discord demande que chaque personne utilise sa propre « appli ». C\'est gratuit, rien n\'est publié et personne d\'autre ne la voit.',
       w1Open: 'Ouvrir le site Discord ↗',
-      w1a: `Connecte-toi si on te le demande, puis clique sur ${K('New Application')} en haut à droite.`,
-      w1b: `Donne-lui un nom (par exemple <b>Voice Overlay</b>), coche la case et clique sur ${K('Create')}.`,
-      w1c: `Sur la page de l\'appli, sous <b>Application ID</b>, clique sur ${K('Copy')} et colle-le ci-dessous.`,
-      w1IdLabel: 'Application ID', w1IdPh: 'Colle l\'Application ID (ou l\'adresse de la page)',
+      w1a: `Connecte-toi si on te le demande, puis clique sur ${K('Nouvelle application')} en haut à droite.`,
+      w1b: `Donne-lui un nom (par exemple <b>Voice Overlay</b>), coche la case des conditions et clique sur ${K('Créer')}.`,
+      w1c: `Sur la page qui s\'ouvre, sous <b>Identifiant d\'application</b>, clique sur ${K('Copier')} et colle-le ci-dessous. Pas la « Clé publique » juste en dessous !`,
+      w1IdLabel: 'Identifiant d\'application', w1IdPh: 'Colle l\'identifiant (ou l\'adresse de la page)',
+      idIsKey: 'Ça, c\'est la « Clé publique ». Il faut l\'identifiant d\'application, juste au-dessus.', keyInSecret: 'Ça, c\'est la « Clé publique » de la page d\'accueil de l\'appli. Il faut la clé secrète, sur cette page OAuth2.',
       idOk: 'Parfait, c\'est le bon code.', idFromUrl: 'Trouvé dans l\'adresse de la page.',
-      idBad: 'Ce n\'est pas ça : l\'Application ID est une suite de 17 à 20 chiffres.',
-      idIsSecret: 'Ça ressemble au Client Secret. Ici, il faut l\'Application ID (que des chiffres) ; le Secret viendra à l\'étape 2.',
+      idBad: 'Ce n\'est pas ça : l\'identifiant d\'application est une suite de 17 à 20 chiffres.',
+      idIsSecret: 'Ça ressemble à la clé secrète. Ici, il faut l\'identifiant d\'application (que des chiffres) ; la clé secrète viendra à l\'étape 2.',
       w2Title: 'Étape 2 · Page OAuth2 de ton appli',
       w2Open: 'Ouvrir la page OAuth2 de mon appli ↗',
-      w2a: `<b>Redirects :</b> clique sur ${K('Add Redirect')} et colle cette adresse dans la case :`,
-      w2aSave: `Puis clique sur le bouton vert ${K('Save Changes')} en bas de la page.`,
-      w2b: `<b>Client Secret :</b> clique sur ${K('Reset Secret')}, confirme avec ${K('Yes, do it!')} (Discord peut demander ton code de double authentification), puis ${K('Copy')} et colle-le ici :`,
-      w2bPh: 'Colle le Client Secret', wz3Keep: 'Laisse vide pour garder le Secret actuel',
-      secretOk: 'C\'est bon.', secretKeep: 'Le Secret actuel sera gardé.',
-      secretIsId: 'Ça, c\'est l\'Application ID. Il faut le Client Secret : lettres et chiffres, environ 32 caractères.',
-      secretBad: 'Le Client Secret a l\'air incomplet : recopie-le avec le bouton « Copy ».',
+      w2a: `<b>Redirections :</b> clique sur ${K('Ajouter Redirect')} et colle cette adresse dans la case qui apparaît :`,
+      w2aSave: `Puis clique sur le bouton vert ${K('Enregistrer les modifications')} en bas de l\'écran.`,
+      w2b: `<b>Clé secrète du client :</b> clique sur ${K('Réinitialiser la clé secrète')}, puis ${K('Oui, fais-le !')} (Discord peut demander ton code de double authentification). Clique sur l\'icône de copie à droite de la case, puis colle ici :`,
+      w2bPh: 'Colle la clé secrète', wz3Keep: 'Laisse vide pour garder la clé secrète actuelle',
+      secretOk: 'C\'est bon.', secretKeep: 'La clé secrète actuelle sera gardée.',
+      secretIsId: 'Ça, c\'est l\'identifiant. Il faut la clé secrète : lettres et chiffres, 32 caractères.',
+      secretBad: 'La clé secrète a l\'air incomplète : recopie-la avec l\'icône de copie.',
       w2Tip: 'Ces codes restent sur ton PC. Ne les montre pas en stream.',
       st: {
         wait: ['Connexion à Discord…', 'Quelques secondes.'],
@@ -476,7 +477,7 @@
       },
       noDiscordTips: ['<b>Discord est déjà ouvert ?</b> Quitte-le complètement (clic droit sur son icône près de l\'horloge → Quitter Discord), relance-le, puis clique sur Réessayer.',
                       'Discord et l\'overlay doivent être lancés de la même façon : pas l\'un en administrateur et l\'autre non.'],
-      errTips: { id: 'Vérifie l\'Application ID (étape 1).', secret: 'Refais « Reset Secret » et colle le nouveau (étape 2).', redirect: 'Vérifie que http://localhost est bien dans Redirects et que tu as cliqué sur Save Changes (étape 2).' },
+      errTips: { id: 'Vérifie l\'identifiant d\'application (étape 1).', secret: 'Refais « Réinitialiser la clé secrète » et colle la nouvelle (étape 2).', redirect: 'Vérifie que http://localhost est dans Redirections et que tu as cliqué sur « Enregistrer les modifications » (étape 2).' },
       w4Done: u => `C'est prêt, ${u} !`,
       w4Text: 'Rejoins un salon vocal : toi et les autres apparaîtrez dans l\'aperçu, puis dans OBS.',
       w4Obs: 'Ajouter à OBS automatiquement', w4Later: 'Plus tard',
@@ -554,21 +555,22 @@
       w1Why: 'To read your voice channel, Discord requires everyone to use their own "app". It\'s free, nothing gets published and nobody else sees it.',
       w1Open: 'Open the Discord site ↗',
       w1a: `Log in if asked, then click ${K('New Application')} in the top right.`,
-      w1b: `Give it a name (for example <b>Voice Overlay</b>), tick the box and click ${K('Create')}.`,
-      w1c: `On the app's page, under <b>Application ID</b>, click ${K('Copy')} and paste it below.`,
+      w1b: `Give it a name (for example <b>Voice Overlay</b>), tick the terms box and click ${K('Create')}.`,
+      w1c: `On the page that opens, under <b>Application ID</b>, click ${K('Copy')} and paste it below. Not the "Public Key" just under it!`,
       w1IdLabel: 'Application ID', w1IdPh: 'Paste the Application ID (or the page address)',
+      idIsKey: 'That\'s the "Public Key". This needs the Application ID, just above it.', keyInSecret: 'That\'s the "Public Key" from the app\'s main page. This needs the Client Secret, on this OAuth2 page.',
       idOk: 'Perfect, that\'s the right code.', idFromUrl: 'Found in the page address.',
       idBad: 'That\'s not it: the Application ID is 17 to 20 digits.',
       idIsSecret: 'That looks like the Client Secret. This box needs the Application ID (digits only); the Secret comes in step 2.',
       w2Title: 'Step 2 · Your app\'s OAuth2 page',
       w2Open: 'Open my app\'s OAuth2 page ↗',
-      w2a: `<b>Redirects:</b> click ${K('Add Redirect')} and paste this address in the box:`,
-      w2aSave: `Then click the green ${K('Save Changes')} button at the bottom of the page.`,
-      w2b: `<b>Client Secret:</b> click ${K('Reset Secret')}, confirm with ${K('Yes, do it!')} (Discord may ask for your two-factor code), then ${K('Copy')} and paste it here:`,
+      w2a: `<b>Redirects:</b> click ${K('Add Redirect')} and paste this address in the box that appears:`,
+      w2aSave: `Then click the green ${K('Save Changes')} button at the bottom of the screen.`,
+      w2b: `<b>Client Secret:</b> click ${K('Reset Secret')}, then ${K('Yes, do it!')} (Discord may ask for your two-factor code). Click the copy icon on the right of the box, then paste here:`,
       w2bPh: 'Paste the Client Secret', wz3Keep: 'Leave empty to keep the current Secret',
       secretOk: 'Looks good.', secretKeep: 'The current Secret will be kept.',
-      secretIsId: 'That\'s the Application ID. This needs the Client Secret: letters and digits, about 32 characters.',
-      secretBad: 'The Client Secret looks incomplete: copy it with the "Copy" button.',
+      secretIsId: 'That\'s the Application ID. This needs the Client Secret: letters and digits, 32 characters.',
+      secretBad: 'The Client Secret looks incomplete: copy it with the copy icon.',
       w2Tip: 'These codes stay on your PC. Keep them off stream.',
       st: {
         wait: ['Connecting to Discord…', 'Just a few seconds.'],
@@ -1274,6 +1276,7 @@
     if (/^\d{15,22}$/.test(t)) return { id: t };
     const m = /applications\/(\d{15,22})/.exec(t) || (/\D/.test(t) && /(?:^|\D)(\d{17,20})(?:\D|$)/.exec(t));
     if (m) return { id: m[1], fromUrl: true };
+    if (/^[0-9a-f]{64}$/i.test(t)) return { looksKey: true };
     if (/^[\w-]{24,64}$/.test(t) && /[a-z]/i.test(t)) return { looksSecret: true };
     return {};
   }
@@ -1281,7 +1284,8 @@
     const t = String(raw || '').trim();
     if (!t) return { empty: true };
     if (/^\d{15,22}$/.test(t)) return { looksId: true };
-    if (/^[\w-]{20,80}$/.test(t)) return { ok: t };
+    if (/^[0-9a-f]{64}$/i.test(t)) return { looksKey: true };
+    if (/^[\w-]{20,48}$/.test(t)) return { ok: t };
     return {};
   }
   function setField(input, okEl, hintEl, state, text) {
@@ -1301,7 +1305,7 @@
       return r.id;
     }
     const empty = !$('cid').value.trim();
-    setField($('cid'), $('cidOk'), $('cidHint'), empty && !final ? '' : 'bad', empty && !final ? '' : r.looksSecret ? S.idIsSecret : S.idBad);
+    setField($('cid'), $('cidOk'), $('cidHint'), empty && !final ? '' : 'bad', empty && !final ? '' : r.looksKey ? S.idIsKey : r.looksSecret ? S.idIsSecret : S.idBad);
     return null;
   }
   function checkSecret(final) {
@@ -1310,7 +1314,7 @@
     if (r.ok) setField($('csecret'), $('csecretOk'), $('csecretHint'), 'good', S.secretOk);
     else if (keep) setField($('csecret'), $('csecretOk'), $('csecretHint'), '', final ? S.secretKeep : '');
     else if (r.empty && !final) setField($('csecret'), $('csecretOk'), $('csecretHint'), '', '');
-    else setField($('csecret'), $('csecretOk'), $('csecretHint'), 'bad', r.looksId ? S.secretIsId : S.secretBad);
+    else setField($('csecret'), $('csecretOk'), $('csecretHint'), 'bad', r.looksId ? S.secretIsId : r.looksKey ? S.keyInSecret : S.secretBad);
     return r.ok ? r.ok : keep ? '' : null;
   }
 
@@ -1336,9 +1340,10 @@
   // Où renvoyer selon l'erreur de Discord.
   function errTarget(m) {
     const t = (m && (m.fr || m)) || '';
-    if (/Client ID/i.test(t)) return { step: 0, tip: 'id' };
-    if (/Secret/i.test(t)) return { step: 1, tip: 'secret' };
-    if (/Redirects|codes/i.test(t)) return { step: 1, tip: 'redirect' };
+    // « codes refusés » cite aussi l'identifiant : on le teste en premier.
+    if (/Redirect|codes/i.test(t)) return { step: 1, tip: 'redirect' };
+    if (/Secret|secrète/i.test(t)) return { step: 1, tip: 'secret' };
+    if (/Client ID|identifiant/i.test(t)) return { step: 0, tip: 'id' };
     return null;
   }
   function wzState() {
