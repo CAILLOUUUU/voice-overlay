@@ -76,6 +76,7 @@ From macOS or Linux: `rustup target add x86_64-pc-windows-gnu`, install `mingw-w
 
 What the Rust version adds to the settings page:
 
+- **A real settings window** instead of a browser tab: same page, shown by Windows' built-in web engine (WebView2), with the app icon. Closing it frees its memory while the overlay keeps running; the tray icon reopens it. External links open in your browser, and the page is still available at `http://localhost:47474/settings`. Without WebView2, the settings open in the browser as before.
 - **One-click update**: when a new version is out, the "Install now" button downloads it from the GitHub release, checks its SHA-256 fingerprint (provided by GitHub), replaces the `.exe` and restarts the app. If anything goes wrong, the old version stays in place.
 - **Ready-made styles**, with a small preview and an undo button.
 - **Drag and drop** to reorder people (mouse or finger; arrow keys work too).

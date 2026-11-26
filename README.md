@@ -80,6 +80,7 @@ Depuis macOS ou Linux : `rustup target add x86_64-pc-windows-gnu`, installer `mi
 
 Ce que la version Rust ajoute dans la page de réglages :
 
+- **Une vraie fenêtre pour les réglages** au lieu d'un onglet du navigateur : même page, affichée par le moteur web de Windows (WebView2), avec l'icône de l'appli. La fermer libère sa mémoire, l'overlay continue de tourner ; l'icône près de l'horloge la rouvre. Les liens externes s'ouvrent dans ton navigateur, et la page reste accessible à `http://localhost:47474/settings`. Sans WebView2, les réglages s'ouvrent dans le navigateur comme avant.
 - **Mise à jour en un clic** : quand une nouvelle version sort, le bouton « Installer maintenant » la télécharge depuis la release GitHub, vérifie son empreinte SHA-256 (donnée par GitHub), remplace le `.exe` et relance l'appli. Si quelque chose ne va pas, l'ancienne version reste en place.
 - **Styles prêts à l'emploi**, avec un petit aperçu et un bouton pour annuler.
 - **Glisser-déposer** pour réordonner les personnes (souris ou doigt ; flèches du clavier aussi).

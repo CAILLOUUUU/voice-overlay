@@ -551,6 +551,11 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
             tokio::spawn(crate::updater::install(app.clone()));
             ok()
         }
+        "/api/show-settings" => {
+            let port = app.config.lock().unwrap().port;
+            platform::show_settings(&format!("http://localhost:{port}/settings"));
+            ok()
+        }
         "/api/retry" => {
             app.request_restart();
             ok()
@@ -598,7 +603,7 @@ async fn diagnostics(app: &Arc<App>) -> String {
         format!("Langue : {} (système : {})", snap["lang"], sys_locale::get_locale().unwrap_or_default()),
         format!("Port : {port}   identifiants Discord : {}   lancement avec Windows : {autostart}", if has_cfg { "oui" } else { "non" }),
         format!("Dossier des données : {}", hide_home(app.paths.dir.display().to_string())),
-        format!("Mémoire utilisée : {mem} Mo"),
+        format!("Mémoire utilisée : {mem} Mo   pages ouvertes (overlay + réglages) : {}", app.tx.receiver_count()),
         String::new(),
         format!("Discord : {}  {msg_en}", snap["status"].as_str().unwrap_or("")),
         format!("Salon vocal : {}  ({} personne(s))", if snap["channel"].is_null() { "aucun" } else { "oui" }, snap["members"].as_array().map_or(0, Vec::len)),

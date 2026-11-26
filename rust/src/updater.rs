@@ -159,10 +159,13 @@ pub async fn install(app: Arc<App>) {
     // Le temps que la page reçoive « redémarrage », puis on passe la main au nouveau programme.
     tokio::time::sleep(Duration::from_millis(400)).await;
     app.save_store();
-    let mut args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--open" && a != "--after-update").collect();
-    if !args.iter().any(|a| a == "--silent") {
-        args.push("--silent".into());
-    }
+    let mut args: Vec<String> = std::env::args().skip(1).filter(|a| !matches!(a.as_str(), "--open" | "--silent" | "--after-update")).collect();
+    // Fenêtre des réglages ouverte : la nouvelle version la rouvre.
+    #[cfg(any(windows, target_os = "macos"))]
+    let reopen = crate::gui::window_open();
+    #[cfg(not(any(windows, target_os = "macos")))]
+    let reopen = false;
+    args.push(if reopen { "--open" } else { "--silent" }.into());
     args.push("--after-update".into());
     match std::process::Command::new(&exe).args(&args).spawn() {
         Ok(_) => {

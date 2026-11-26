@@ -33,6 +33,11 @@ function AskOpt($question) {
     if ($a -eq 's') { return $null }
     return $a -eq 'y'
 }
+# WebView2 processes started by the app (the settings window)
+function WebViewCount($appPid) {
+    @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.ParentProcessId -eq $appPid }).Count
+}
 function ListenerPid {
     $c = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($c) { return [int]$c.OwningProcess }
@@ -181,7 +186,7 @@ if (-not $state) {
     if (-not $state.hasConfig) {
         Say ''
         Say 'No Discord credentials found. The settings page will open: follow the setup steps there.' 'Yellow'
-        Start-Process "$base/settings"
+        Api '/api/show-settings' '{}' | Out-Null
     }
     Say ''
     Say 'Waiting for the Discord connection (if Discord shows an "Authorize" window, click Authorize)...' 'Yellow'
@@ -276,14 +281,27 @@ if (-not $state) {
     Say '(The tray icon may be hidden behind the ^ arrow next to the clock.)'
     Check 'You see the Voice Overlay icon next to the clock' (Ask 'Do you see the Voice Overlay icon next to the clock?')
     Check 'Only one icon after the update' (Ask 'Move the mouse over the icons next to the clock. Is there exactly ONE Voice Overlay icon?')
-    Check 'Left-click on the icon opens the settings' (Ask 'Left-click the icon: does the settings page open in your browser?')
+    Check 'Left-click on the icon opens the settings window' (Ask 'Left-click the icon: does the settings open in their OWN window (no browser tabs or address bar)?')
+    Start-Sleep -Seconds 2
+    $wv = WebViewCount $proc.Id
+    Check 'Settings window uses WebView2' ($wv -gt 0) "$wv processes"
+    Check 'WebView data kept in the app data folder' ((Test-Path (Join-Path $testData 'webview')) -and -not (Get-ChildItem $exe.DirectoryName -Filter '*.WebView2' -ErrorAction SilentlyContinue))
     Check 'Right-click shows the menu' (Ask 'Right-click the icon: do you see "Open settings" and "Quit"?')
-    Check 'Settings page looks normal' (Ask 'Does the settings page look like the usual one (no errors, preview visible)?')
+    Check 'Settings page looks normal' (Ask 'Does the settings window look like the usual settings page (no errors, preview visible)?')
+    Check 'Links open in your browser' (Ask 'At the very bottom of the settings window, click "Component licenses" (or "Licences des composants"). Does it open in your normal browser?')
+    Check 'Clicking the icon again reuses the window' (Ask 'Left-click the tray icon again: does the SAME window come to the front (no second window)?')
     Check 'Ready-made styles' (Ask 'In "Ready-made styles", click a style: does the preview on the right change?')
     $r = AskOpt 'Under "Overlay profiles", click "Add to OBS..." and follow the help text (needs OBS open). Did the source appear in OBS?'
     if ($null -eq $r) { Note 'Add to OBS: skipped' } else { Check 'Add to OBS automatically' $r }
+    $memOpen = [math]::Round((Get-Process -Id $proc.Id).WorkingSet64 / 1MB, 1)
+    Read-Host 'Now CLOSE the settings window with its X, then press Enter'
+    Start-Sleep -Seconds 4
+    $wv = WebViewCount $proc.Id
+    Check 'Closing the window frees WebView2' ($wv -eq 0) "$wv processes left"
+    Check 'App keeps running after closing the window' ([bool](Api '/api/state'))
+    Note "Memory with the window open: $memOpen MB"
     $mem = [math]::Round((Get-Process -Id $proc.Id -ErrorAction SilentlyContinue).WorkingSet64 / 1MB, 1)
-    Note "Memory used by the app: $mem MB"
+    Note "Memory used by the app (window closed): $mem MB"
     Check 'Quit from the tray menu closes the app' (Ask 'Right-click the icon and choose Quit. Did the icon disappear?')
     Start-Sleep -Seconds 1
 }

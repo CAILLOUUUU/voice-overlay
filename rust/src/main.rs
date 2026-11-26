@@ -13,6 +13,8 @@ mod assets;
 mod config;
 mod discord;
 mod dpm;
+#[cfg(any(windows, target_os = "macos"))]
+mod gui;
 mod league;
 mod platform;
 mod server;
@@ -153,7 +155,19 @@ fn main() {
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
             log::error!("Le port {port} est déjà utilisé : l'overlay tourne déjà.");
             if !args.silent {
-                platform::open_url(&format!("{base}/settings"));
+                // On demande à l'appli déjà lancée d'ouvrir sa fenêtre ; sinon, navigateur.
+                let shown = rt.block_on(async {
+                    reqwest::Client::new()
+                        .post(format!("http://127.0.0.1:{port}/api/show-settings"))
+                        .header("Host", format!("localhost:{port}"))
+                        .timeout(Duration::from_secs(3))
+                        .send()
+                        .await
+                        .is_ok_and(|r| r.status().is_success())
+                });
+                if !shown {
+                    platform::open_url(&format!("{base}/settings"));
+                }
             }
             return;
         }
@@ -187,27 +201,21 @@ fn main() {
             rt.spawn(league::run(app.clone()));
         }
     }
-    if args.open || (!args.silent && !cfg!(debug_assertions)) {
-        platform::open_url(&format!("{base}/settings"));
-    }
+    let show = args.open || (!args.silent && !cfg!(debug_assertions));
+    let settings_url = format!("{base}/settings");
 
-    #[cfg(windows)]
+    // Windows et macOS : fenêtre des réglages + icône près de l'horloge (sur le fil principal).
+    #[cfg(any(windows, target_os = "macos"))]
     {
-        let a = app.clone();
-        // L'icône vit sur le fil principal ; « Quitter » enregistre puis ferme l'appli.
-        let a2 = app.clone();
-        let closed = platform::run_tray(format!("{base}/settings"), ui_is_fr(&lang), move || {
-            a.save_store();
-            platform::exit_app();
-        });
-        if closed {
-            a2.save_store();
-            std::process::exit(0);
-        }
+        let with_tray = cfg!(windows) || std::env::var_os("VO_TRAY").is_some();
+        let _rt = rt; // le moteur asynchrone reste en vie pendant toute l'interface
+        gui::run(app, settings_url, port, ui_is_fr(&lang), show, with_tray);
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
-        let _ = ui_is_fr(&lang);
+        if show {
+            platform::open_url(&settings_url);
+        }
         let a = app.clone();
         rt.block_on(async move {
             let _ = tokio::signal::ctrl_c().await;
@@ -215,6 +223,4 @@ fn main() {
             std::process::exit(0);
         });
     }
-    // Icône indisponible : on continue sans elle.
-    rt.block_on(std::future::pending::<()>());
 }

@@ -32,9 +32,13 @@ sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
-tray-icon = "0.21"
-windows-sys = { version = "0.60", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading"] }
 keyring = { version = "3", features = ["windows-native"] }
+
+# Fenêtre des réglages (WebView2 sous Windows, WKWebView sous macOS) et icône près de l'horloge
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+tray-icon = "0.27"
+tao = "0.38"
+wry = { version = "0.58", default-features = false, features = ["os-webview"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
