@@ -106,8 +106,12 @@ struct Lock {
 /// Où chercher le « lockfile » du client League.
 struct Finder {
     from_process: Option<PathBuf>,
+    /// Port et mot de passe lus directement dans la ligne de commande du client.
+    from_args: Option<(u16, String)>,
     checked_at: Option<Instant>,
     sys: sysinfo::System,
+    /// Dernier diagnostic écrit dans le journal (pour ne l'écrire qu'une fois par changement).
+    last_note: String,
 }
 
 impl Finder {
@@ -135,15 +139,33 @@ impl Finder {
             return;
         }
         self.checked_at = Some(Instant::now());
-        self.sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-        self.from_process = self
-            .sys
-            .processes()
-            .values()
-            .find(|p| p.name().to_string_lossy().eq_ignore_ascii_case("LeagueClientUx.exe"))
-            .and_then(|p| p.exe())
-            .and_then(|e| e.parent())
-            .map(PathBuf::from);
+        self.sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All,
+            true,
+            sysinfo::ProcessRefreshKind::nothing().with_exe(sysinfo::UpdateKind::Always).with_cmd(sysinfo::UpdateKind::Always),
+        );
+        let proc = self.sys.processes().values().find(|p| p.name().to_string_lossy().eq_ignore_ascii_case("LeagueClientUx.exe"));
+        self.from_process = proc.and_then(|p| p.exe()).and_then(|e| e.parent()).map(PathBuf::from);
+        self.from_args = proc.and_then(|p| {
+            let args: Vec<String> = p.cmd().iter().map(|a| a.to_string_lossy().into_owned()).collect();
+            parse_client_args(&args)
+        });
+        let note = match proc {
+            None => "Client League : processus LeagueClientUx introuvable.".to_string(),
+            Some(_) => format!(
+                "Client League : processus trouvé (dossier {}, ligne de commande {}).",
+                self.from_process.as_ref().map(|d| d.display().to_string()).unwrap_or_else(|| "illisible".into()),
+                if self.from_args.is_some() { "lue" } else { "illisible" }
+            ),
+        };
+        self.note(note);
+    }
+
+    fn note(&mut self, n: String) {
+        if n != self.last_note {
+            log::info!("{n}");
+            self.last_note = n;
+        }
     }
 
     fn lockfile(&mut self) -> Option<Lock> {
@@ -153,6 +175,7 @@ impl Finder {
                 let parts: Vec<&str> = txt.trim().split(':').collect();
                 if parts.len() >= 4 {
                     if let Ok(port) = parts[2].parse() {
+                        self.note(format!("Client League : lockfile trouvé dans {}.", dir.display()));
                         return Some(Lock { port, password: parts[3].to_string() });
                     }
                 }
@@ -161,8 +184,21 @@ impl Finder {
                 self.refresh_from_process();
             }
         }
+        // Pas de lockfile lisible : le port et le mot de passe sont aussi dans la ligne de commande du client.
+        if let Some((port, password)) = self.from_args.clone() {
+            self.note("Client League : connexion via la ligne de commande du client.".into());
+            return Some(Lock { port, password });
+        }
         None
     }
+}
+
+/// `--app-port=1234` et `--remoting-auth-token=xxx` dans la ligne de commande de LeagueClientUx.
+fn parse_client_args(args: &[String]) -> Option<(u16, String)> {
+    let get = |k: &str| args.iter().find_map(|a| a.trim_matches('"').strip_prefix(k).map(String::from));
+    let port = get("--app-port=")?.parse().ok()?;
+    let token = get("--remoting-auth-token=")?;
+    (!token.is_empty()).then_some((port, token))
 }
 
 /// Requête locale vers le client League (certificat auto-signé de Riot, uniquement sur 127.0.0.1).
@@ -206,14 +242,17 @@ impl Reader {
             local_get(&self.http, lock.port, "/lol-lobby/v2/lobby", pw),
             local_get(&self.http, lock.port, "/lol-champ-select/v1/session", pw),
         );
-        let status = if lobby.is_some() || session.is_some() { "on" } else { "off" };
-        // Ton propre Riot ID : te relie directement à ton compte Discord.
-        if status == "on" && app.read(|i| i.league.me.is_none()) {
-            if let Some(v) = local_get(&self.http, lock.port, "/lol-summoner/v1/current-summoner", pw).await {
-                let name = s(&v, "gameName");
-                if !name.is_empty() {
-                    me = Some(RiotLink { name: name.into(), tag: s(&v, "tagLine").into() });
-                }
+        // Hors salon, /lol-lobby répond 404 : on demande donc aussi ton compte, qui répond dès que le client est ouvert.
+        // Ton propre Riot ID te relie aussi directement à ton compte Discord.
+        let summoner = local_get(&self.http, lock.port, "/lol-summoner/v1/current-summoner", pw).await;
+        let status = if lobby.is_some() || session.is_some() || summoner.is_some() { "on" } else { "off" };
+        if status == "off" {
+            self.finder.note(format!("Client League : le client ne répond pas sur le port {}.", lock.port));
+        }
+        if let Some(v) = summoner.filter(|_| app.read(|i| i.league.me.is_none())) {
+            let name = s(&v, "gameName");
+            if !name.is_empty() {
+                me = Some(RiotLink { name: name.into(), tag: s(&v, "tagLine").into() });
             }
         }
         for v in [&lobby, &session].into_iter().flatten() {
@@ -260,7 +299,7 @@ pub async fn run(app: Arc<App>) {
         .no_proxy()
         .build()
         .expect("client HTTP");
-    let mut reader = Reader { http, finder: Finder { from_process: None, checked_at: None, sys: sysinfo::System::new() }, names: HashMap::new() };
+    let mut reader = Reader { http, finder: Finder { from_process: None, from_args: None, checked_at: None, sys: sysinfo::System::new(), last_note: String::new() }, names: HashMap::new() };
     loop {
         let (status, me, players) = reader.read(&app).await;
         app.update(|i| {
@@ -314,6 +353,13 @@ mod tests {
         let roles = match_roles(&i, &players);
         assert_eq!(roles.len(), 1);
         assert_eq!(roles["30002"], "top", "le plus ressemblant gagne");
+    }
+
+    #[test]
+    fn reads_port_and_token_from_command_line() {
+        let a: Vec<String> = ["C:\\Riot\\LeagueClientUx.exe", "\"--remoting-auth-token=abc123\"", "--app-port=51234"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(parse_client_args(&a), Some((51234, "abc123".into())));
+        assert_eq!(parse_client_args(&a[..2]), None);
     }
 
     #[test]

@@ -1066,12 +1066,11 @@ async function readLeague() {
       localGet(lock.port, '/lol-lobby/v2/lobby', lock.password),
       localGet(lock.port, '/lol-champ-select/v1/session', lock.password),
     ]);
-    league.status = lobby || session ? 'on' : 'off';
-    // Ton propre Riot ID : te relie directement à ton compte Discord.
-    if (!league.self && league.status === 'on') {
-      const me = await localGet(lock.port, '/lol-summoner/v1/current-summoner', lock.password);
-      if (me && me.gameName) league.self = { name: me.gameName, tag: me.tagLine || '' };
-    }
+    // Hors salon, /lol-lobby répond 404 : on demande donc aussi ton compte, qui répond dès que le client est ouvert.
+    // Ton propre Riot ID te relie aussi directement à ton compte Discord.
+    const me = await localGet(lock.port, '/lol-summoner/v1/current-summoner', lock.password);
+    league.status = lobby || session || me ? 'on' : 'off';
+    if (!league.self && me && me.gameName) league.self = { name: me.gameName, tag: me.tagLine || '' };
     if (league.self && state.selfId && !dpm.links.has(state.selfId) && !dpm.blocked.has(blockKey(state.selfId, riotKey(league.self.name, league.self.tag)))) {
       dpm.links.set(state.selfId, { ...league.self });
       console.log(`Lien (client League) : toi ↔ ${league.self.name}#${league.self.tag}`);
