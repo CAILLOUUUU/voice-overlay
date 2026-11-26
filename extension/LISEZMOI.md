@@ -25,3 +25,4 @@ Content-Type: application/json
 ```
 
 L'appli accepte cet appel uniquement depuis une extension Chrome (`chrome-extension://…`) ou depuis ses propres pages.
+Aucune permission n'est nécessaire dans l'extension. Guide complet : [INTEGRATION-MARSO.md](INTEGRATION-MARSO.md).

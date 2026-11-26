@@ -688,7 +688,22 @@ http.createServer((req, res) => {
     });
   }
 
-  if (url === '/api/dpm' && req.method === 'POST' && (isExtensionRequest(req) || isLocalRequest(req))) {
+  if (url === '/api/dpm' || url === '/api/dpm/ping') {
+    // Une extension Chrome peut appeler ces deux adresses sans permission spéciale :
+    // l'appli autorise les origines chrome-extension:// (CORS), et seulement elles.
+    const ext = isExtensionRequest(req);
+    if (ext) {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Private-Network', 'true');
+      res.setHeader('Vary', 'Origin');
+    }
+    if (req.method === 'OPTIONS') { res.writeHead(ext ? 204 : 403); return res.end(); }
+    if (!ext && !isLocalRequest(req)) return sendJson(res, 403, { error: 'interdit' });
+    // « L'appli est-elle lancée ? » : pratique pour que l'extension affiche un état ou un lien de téléchargement.
+    if (url === '/api/dpm/ping') return sendJson(res, 200, { app: 'voice-overlay', version: VERSION });
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'POST attendu' });
     return readBody(req).then(b => { dpmUpdate(b); sendJson(res, 200, { ok: true }); }).catch(e => sendJson(res, 400, { error: e.message }));
   }
   if (url.startsWith('/api/')) {
