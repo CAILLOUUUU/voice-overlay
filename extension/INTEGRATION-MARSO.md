@@ -32,7 +32,20 @@ C'est exactement le contenu de la réponse `GET /api/v1/lobby/<id>` que la page 
 
 **Le plus important : envoyer dès que `inVoice` change.** L'appli relie chaque personne Discord à son Riot ID en comparant l'instant où elle rejoint le vocal Discord à l'instant où sa pastille passe au vert. Plus l'envoi est rapide après le changement, mieux ça marche. Le plus simple : intercepter les réponses `/api/v1/lobby/<id>` que la page fait déjà (aucune requête en plus vers DPM), comme le fait `page.js` dans ce dossier.
 
-## 2. Savoir si l'appli est lancée (facultatif)
+## 2. Signal de vie (recommandé)
+
+Dans les réglages, l'appli affiche un voyant « Pont DPM connecté ». Pour qu'il reste vert même quand aucune page DPM n'est ouverte, appelle `/api/dpm/ping` depuis le service worker environ une fois par minute (sinon le voyant passe au gris 2 à 3 minutes après le dernier lobby reçu) :
+
+```js
+// manifest.json : "permissions": ["alarms"] (pas d'avertissement pour les utilisateurs)
+const ping = () => fetch('http://127.0.0.1:47474/api/dpm/ping').catch(() => {});
+const start = () => { chrome.alarms.create('vo-ping', { periodInMinutes: 1 }); ping(); };
+chrome.runtime.onInstalled.addListener(start);
+chrome.runtime.onStartup.addListener(start);
+chrome.alarms.onAlarm.addListener(a => { if (a.name === 'vo-ping') ping(); });
+```
+
+## 3. Savoir si l'appli est lancée (facultatif)
 
 ```js
 const r = await fetch('http://127.0.0.1:47474/api/dpm/ping').catch(() => null);

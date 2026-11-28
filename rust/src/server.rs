@@ -252,6 +252,10 @@ async fn dpm_route(app: &Arc<App>, req: Request, port: u16) -> Response {
         plain(403, "interdit")
     } else if req.uri().path() == "/api/dpm/ping" {
         // « L'appli est-elle lancée ? » : pour que l'extension affiche un état ou un lien de téléchargement.
+        // Venant de l'extension, c'est aussi son signal de vie (voyant « Pont DPM connecté »).
+        if ext {
+            app.update(|i| i.dpm_ping());
+        }
         json_resp(200, json!({ "app": "voice-overlay", "version": VERSION }))
     } else if req.method() != Method::POST {
         plain(405, "POST attendu")

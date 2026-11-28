@@ -58,6 +58,20 @@ impl Inner {
         self.dpm_player_of(id).map(|p| p.side.clone()).unwrap_or_default()
     }
 
+    /// L'extension (pont DPM) a donné des nouvelles récemment. Elle envoie un signal chaque minute.
+    pub fn dpm_extension_connected(&self) -> bool {
+        now_ms() - self.dpm.last_extension.max(self.dpm.last_ping) < 150_000
+    }
+
+    /// Signal de l'extension : prévient les pages tout de suite si elle vient d'apparaître.
+    pub fn dpm_ping(&mut self) {
+        self.dpm.last_ping = now_ms();
+        if !self.dpm.ext_shown {
+            self.dpm.ext_shown = true;
+            self.broadcast();
+        }
+    }
+
     pub fn dpm_status(&self) -> Value {
         let lobby = self.live_lobby().map(|l| {
             let linked: HashSet<String> = self.dpm.links.values().map(link_key).collect();
@@ -69,7 +83,7 @@ impl Inner {
             })
         });
         json!({
-            "extension": now_ms() - self.dpm.last_extension < 10 * 60 * 1000,
+            "extension": self.dpm_extension_connected(),
             "lobby": lobby,
             "links": self.dpm.links.len(),
         })

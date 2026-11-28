@@ -100,6 +100,11 @@
 
   /* ---------- Personnes : un classement DPM qu'on peut modifier ---------- */
   #leagueInfo { margin-bottom: 10px; font-size: 12.5px; }
+  .dpmrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+  .dpmdot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dpmdot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  #dpmHelp { font-weight: 500; font-size: 12.5px; }
+  .rolesnote { margin-top: 8px; font-size: 12.5px; }
   #leagueInfo:empty { display: none; }
   .empty { color: var(--dim); margin: 4px 0; padding: 22px; border: 1px dashed var(--line2); border-radius: 8px; text-align: center; }
   #people { display: flex; flex-direction: column; margin: 0 -18px; }
@@ -336,10 +341,12 @@
 
     <div class="pane" id="pane-people" role="tabpanel" aria-labelledby="tab-people">
       <section>
+        <div class="dpmrow"><span class="dpmdot" id="dpmDot"></span><span id="dpmText"></span><a id="dpmHelp" href="https://github.com/CAILLOUUUU/voice-overlay/tree/main/extension" target="_blank" rel="noopener" data-t="dpmHelp" hidden></a></div>
         <p class="muted" id="leagueInfo"></p>
         <p class="empty" id="peopleEmpty" data-t="peopleEmpty"></p>
         <div id="people"></div>
         <p class="muted" id="peopleFoot" hidden data-t="peopleHelp"></p>
+        <p class="muted rolesnote" id="rolesNote" hidden data-t="rolesNote"></p>
       </section>
       <details class="more">
         <summary data-t="peopleMore"></summary>
@@ -520,6 +527,8 @@
       leagueOff: 'Client League fermé : choisis les rôles à la main, ou ouvre League pour les détecter.',
       dpmLobby: (v, n, l) => `Lobby DPM reçu : ${v}/${n} dans le vocal, ${l} relié(s) à Discord.`,
       dpmWaiting: 'Pont DPM actif : en attente d\'un lobby.',
+      dpmOn: 'Pont DPM connecté', dpmOff: 'Pont DPM non détecté', dpmHelp: 'Installer l\'extension ↗',
+      rolesNote: 'La détection automatique des rôles (DPM et League) n\'est pas parfaite : si un rôle est mal attribué, choisis le bon dans le menu de la personne. Un rôle choisi à la main passe toujours avant la détection.',
       linksReset: n => `Oublier les liens Discord ↔ League (${n})`, unlink: 'oublier',
       linksWhy: n => `Pendant tes lobbies inhouse.dpm.lol, l'appli apprend quel compte Discord correspond à quel Riot ID (${n} lien${n > 1 ? 's' : ''} pour l'instant). C'est ce qui lui permet de mettre le bon rôle à chacun dès la game suivante. Si tu les oublies, elle devra tout réapprendre au prochain lobby. Tes renommages, ton ordre et les rôles choisis à la main ne changent pas.`,
       linksYes: 'Oui, tout oublier', linksNo: 'Annuler',
@@ -625,6 +634,8 @@
       leagueOff: 'League client closed: pick roles by hand, or open League to detect them.',
       dpmLobby: (v, n, l) => `DPM lobby received: ${v}/${n} in voice, ${l} linked to Discord.`,
       dpmWaiting: 'DPM bridge active: waiting for a lobby.',
+      dpmOn: 'DPM bridge connected', dpmOff: 'DPM bridge not detected', dpmHelp: 'Install the extension ↗',
+      rolesNote: 'Automatic role detection (DPM and League) isn\'t perfect: if a role is wrong, pick the right one in the person\'s menu. A role picked by hand always wins over detection.',
       linksReset: n => `Forget Discord ↔ League links (${n})`, unlink: 'forget',
       linksWhy: n => `During your inhouse.dpm.lol lobbies, the app learns which Discord account matches which Riot ID (${n} link${n > 1 ? 's' : ''} so far). That's how it gives everyone the right role from the next game on. If you forget them, it will have to learn them again at the next lobby. Your renames, your order and the roles you picked by hand don't change.`,
       linksYes: 'Yes, forget them all', linksNo: 'Cancel',
@@ -1162,7 +1173,10 @@
     const ls = (s.league || {}).status;
     const d = s.dpm || {};
     $('leagueInfo').textContent = d.lobby ? S.dpmLobby(d.lobby.inVoice, d.lobby.players, d.lobby.linked)
-      : (d.extension ? S.dpmWaiting + ' ' : '') + (ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff);
+      : (ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff);
+    $('dpmDot').classList.toggle('on', !!d.extension);
+    $('dpmText').textContent = d.extension ? S.dpmOn : S.dpmOff;
+    $('dpmHelp').hidden = !!d.extension;
     $('linksReset').textContent = S.linksReset(d.links || 0);
     $('linksReset').hidden = !d.links;
     linksCount = d.links || 0;
@@ -1172,6 +1186,7 @@
     $('peopleCount').textContent = ms.length;
     $('peopleCount').classList.toggle('live', ms.some(m => m.speaking));
     $('peopleFoot').hidden = ms.length === 0;
+    $('rolesNote').hidden = ms.length === 0;
     const key = ms.map(m => m.id).join(',');
     peopleIds = ms.map(m => m.id);
     if (key !== peopleKey) {

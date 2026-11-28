@@ -82,6 +82,10 @@ pub struct Dpm {
     /// arrivées dans le vocal pendant ce lobby : (id Discord, instant)
     pub joins: Vec<(String, i64)>,
     pub last_extension: i64,
+    /// dernier signal « je suis là » de l'extension (toutes les minutes, même sans page DPM ouverte)
+    pub last_ping: i64,
+    /// état « extension connectée » déjà envoyé aux pages
+    pub ext_shown: bool,
     /// liens oubliés à la main : « idDiscord|riotKey », pas recréés avant le prochain lobby
     pub blocked: HashSet<String>,
 }
@@ -452,7 +456,10 @@ impl App {
             self.update(|i| {
                 let n = i.custom.len() + i.order.len();
                 i.prune_people();
-                if i.custom.len() + i.order.len() != n {
+                // L'extension s'est tue depuis un moment : le voyant passe au gris.
+                let ext = i.dpm_extension_connected();
+                if i.custom.len() + i.order.len() != n || ext != i.dpm.ext_shown {
+                    i.dpm.ext_shown = ext;
                     i.broadcast();
                 }
             });
