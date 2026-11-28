@@ -1,98 +1,48 @@
 # VOICE OVERLAY - CAILLOU FEAT CLAUDE
 
-🇫🇷 **Version française : [README.md](README.md)**
+🇫🇷 [Version française](README.md)
 
-An OBS overlay that shows who is in **your** Discord voice channel, and follows you automatically when you switch channels. No channel to pick by hand, nothing to install on the server.
+An OBS overlay that shows who is in **your** Discord voice channel, and follows you on its own when you switch channels.
 
-![Settings page with live preview](docs/settings.png)
+![Settings with live preview](docs/settings.png)
 
-- Shows who is speaking, muted or deafened, with Discord avatar decorations
-- Follows whatever voice channel you are in, and shows nothing when you are in none
-- Rename, reorder or hide people on the fly, without losing it all if Discord crashes
-- Live settings page: layout, colors, 12 included fonts (or import your own), custom CSS
-- League of Legends roles (Top, Jungle, Mid, ADC, Support) detected from the League client when names look alike, or picked by hand, with automatic sorting
-- [DPM](https://inhouse.dpm.lol) inhouses: with the included Chrome extension (`extension` folder), each player's role and team, and the Discord ↔ League link learned automatically as players join the voice channel
-- Several overlay profiles usable at the same time (for example vertical in game, horizontal elsewhere), each with its own OBS link
-- Export your style to a file and share it
-- English and French
-
-> **Good to know:** this app relies on a Discord feature (local RPC) that Discord still labels as a private beta. If Discord changes or closes it, the overlay will stop working. Each user also needs to create their own free Discord "application" (the app walks you through it, about 2 minutes).
+- Shows who is speaking, muted or deafened
+- Switches channels with you, and hides when you're in none
+- Rename, reorder or hide people
+- Fully customizable look, with ready-made styles
+- League of Legends roles shown and sorted (Top, Jgl, Mid, ADC, Sup)
+- Several profiles at once, one per OBS scene
+- In French and English
 
 ## Install (Windows)
 
-1. Download `Voice-Overlay-<version>.exe` (for example `Voice-Overlay-1.2.0.exe`) from the Releases page and put it wherever you like (Downloads, Desktop…). It creates no files next to itself.
-2. Open the Discord **desktop** app, then run the `.exe`.
-   - Windows may show "Windows protected your PC": click **More info**, then **Run anyway**. This is expected for an unsigned app.
-3. A setup assistant opens in your browser and guides you through 4 steps to link the overlay to Discord.
-4. At the end, Discord opens a window: click **Authorize**.
+1. Download the latest `Voice-Overlay-<version>.exe` from [Releases](../../releases/latest).
+2. Open the Discord app (not the website), then run the `.exe`.
+   If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**.
+3. Follow the assistant (about 3 minutes, only once), then click **Authorize** in Discord.
 
-The app then runs in the background with an icon next to the clock: left-click for settings, right-click to quit.
+The app then runs in the background, with an icon next to the clock. It updates in one click.
 
 ## In OBS
 
-Add a **Browser** source with the profile's link, shown in the settings (for example `http://localhost:47474/?profile=principal`). Width 400, height 600 to start. The background is transparent.
+Add a **Browser** source with the link shown in the settings ("Profile & OBS" tab), 400 × 600 to start. The background is transparent.
 
-Each profile has its own link: create one per scene and add each link to its scene. They all work at the same time.
+## DPM inhouses
 
-For quick tweaks, URL options override the profile's settings:
-`?title` `?noTitle` `?hideSelf` `?speakingOnly` `?noName` `?size=48` `?align=right` `?layout=row`
+With the Chrome extension in the [`extension`](extension) folder, the overlay gets each player's role and team from your [inhouse.dpm.lol](https://inhouse.dpm.lol) lobby, and links each Discord account to its Riot ID on its own.
 
-## Privacy
+Detection isn't perfect: if a role is wrong, pick the right one by hand in the "People" tab.
 
-- Everything runs on your PC. Your settings and Discord codes are stored in `%APPDATA%\VoiceOverlayCaillou` ("Open" button in the Application section of the settings). Never share `config.json` or `token.json` or show them on stream.
+## In-game overlay
 
-If something goes wrong, `voice-overlay.log` in that folder explains what happened. To reset everything, quit the app and delete that folder.
-- The only outside requests are to Discord (login, avatars) and to GitHub, to check whether a newer version exists.
+The "In game" tab shows your voice channel on top of League during your games. It's hidden from your stream. League must be in "Borderless" or "Windowed" mode. Ctrl+Shift+O to move it.
 
-## Development
+## Good to know
 
-No dependencies to run, only Node.js 20 or later:
-
-```
-node server.js --open     # normal mode (Discord desktop open)
-node server.js --demo     # fake members, no Discord needed
-```
-
-| File | Role |
-|---|---|
-| `server.js` | Discord connection (local RPC), local server, settings |
-| `overlay.html` | The page shown in OBS |
-| `settings.html` | The settings page and setup assistant |
-| `webfonts/` | Included fonts (OFL license) |
-| `build/` | Builds the `.exe` (`cd build && npm install && node build.js`) |
-
-### Rust version (`rust/`)
-
-The same program, rewritten in Rust: a ~3 MB `.exe` instead of bundling Node.js, a real tray icon (no more PowerShell script), and the Client Secret and Discord token stored in Windows Credential Manager instead of `config.json` and `token.json` (moved automatically on first launch). `overlay.html` and `settings.html` are unchanged and embedded in the `.exe`, and the addresses (`/events`, `/api/...`) are the same, so the Chrome extension works as is.
-
-```
-cd rust
-cargo run -- --demo --port=47474   # fake members, no Discord needed
-cargo test                         # tests (name matching, DPM links, Discord protocol…)
-cargo build --release              # .exe in rust/target/release (on Windows)
-```
-
-From macOS or Linux: `rustup target add x86_64-pc-windows-msvc`, `cargo install cargo-xwin`, install `mingw-w64` (for the icon), then `cargo xwin build --release --target x86_64-pc-windows-msvc`. Don't use the `-gnu` target: the `.exe` would need `WebView2Loader.dll` next to it. The `.github/workflows/rust.yml` workflow builds the `.exe` on Windows and attaches it to the release for every `v*` tag.
-
-What the Rust version adds to the settings page:
-
-- **A real settings window** instead of a browser tab: same page, shown by Windows' built-in web engine (WebView2), with the app icon. Closing it frees its memory while the overlay keeps running; the tray icon reopens it. External links open in your browser, and the page is still available at `http://localhost:47474/settings`. Without WebView2, the settings open in the browser as before.
-- **One-click update**: when a new version is out, the "Install now" button downloads it from the GitHub release, checks its SHA-256 fingerprint (provided by GitHub), replaces the `.exe` and restarts the app. If anything goes wrong, the old version stays in place.
-- **Ready-made styles**, with a small preview and an undo button.
-- **Drag and drop** to reorder people (mouse or finger; arrow keys work too).
-- **In-game overlay** ("In game" tab): your voice channel on top of League, only during a game, with its own style. The mouse goes through it, it never takes focus from the game and it is invisible in OBS and screen shares. A shortcut (Ctrl+Shift+O by default) brings it up so you can move it. League must be in "Borderless" or "Windowed" mode.
-- **Copy diagnostics**: a report to send when something goes wrong (versions, statuses, League/DPM detection, end of the log; no passwords or Discord codes).
-
-#### Signing the `.exe` (removes the "Windows protected your PC" warning)
-
-1. Apply for the free open-source plan at [signpath.org](https://signpath.org) (the repository must be public).
-2. In SignPath, create a `voice-overlay` project linked to this GitHub repository, with a `release-signing` signing policy.
-3. On GitHub, under Settings → Secrets and variables → Actions: add the `SIGNPATH_ORGANIZATION_ID` variable and the `SIGNPATH_API_TOKEN` secret.
-
-From then on, every `v*` tag publishes a signed `.exe`. Until this is set up, the workflow publishes the `.exe` unsigned, as before.
-
-Useful options: `--port=N` (or `VO_PORT`), `--silent`, `VO_DATA_DIR` (other data folder), `VO_ASSETS_DIR=..` (reads the pages from disk, no rebuild), `VO_NO_KEYRING=1` (secrets in files), `VO_DEBUG=1` (detailed log). In `config.json`, `extensionIds` restricts the DPM bridge to specific extensions. The extension calls port 47474: if you change it, edit `extension/background.js` too.
+- Everything stays on your PC. The app only connects to Discord and GitHub (for updates).
+- It uses a Discord feature that is still in beta: if Discord changes it, the overlay may stop working.
+- If something goes wrong: "App" tab → **Copy diagnostics**, and send it with your question.
 
 ## Credits
 
-Made by Caillou, built with Claude. Released under the [MIT License](LICENSE). Bundles Node.js and open fonts: see [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
+Made by Caillou, with Claude. Rust version by tbrowang. [MIT license](LICENSE) · [Third-party licenses](LICENCES-TIERS.txt)
