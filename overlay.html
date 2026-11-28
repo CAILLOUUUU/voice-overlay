@@ -105,6 +105,20 @@
   }
   #hint[hidden] { display: none; }
 
+  /* ---------- Overlay en jeu : cadre pour le déplacer ---------- */
+  html.ingame, html.ingame body { height: 100%; user-select: none; }
+  #placeTip, #grip { display: none; }
+  body.placing { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .9); background: rgba(10, 12, 16, .4); cursor: move; }
+  body.placing #placeTip {
+    display: block; position: fixed; left: 8px; right: 26px; bottom: 8px; pointer-events: none;
+    font: 600 12px/1.35 "Segoe UI", system-ui, sans-serif; color: #fff;
+    background: rgba(0, 0, 0, .75); padding: 6px 8px; border-radius: 6px;
+  }
+  body.placing #grip {
+    display: block; position: fixed; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, .9) 50%);
+  }
+
   @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
   @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-12%); } }
   @keyframes eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
@@ -117,6 +131,8 @@
   <div id="title" hidden></div>
   <div id="list"></div>
 </div>
+<div id="placeTip"></div>
+<div id="grip"></div>
 
 <template id="tpl">
   <div class="m">
@@ -139,6 +155,7 @@
   const p = new URLSearchParams(location.search);
   const PREVIEW = p.has('preview');
   const PROFILE = p.get('profile');
+  const INGAME = p.has('ingame'); // fenêtre par-dessus le jeu (ouverte par l'appli)
   const ROLE_LABEL = { top: 'TOP', jungle: 'JGL', mid: 'MID', adc: 'ADC', support: 'SUP' }; // ?profile=… : quel profil d'overlay afficher (sinon le premier)
 
   function withOverrides(s) {
@@ -207,6 +224,20 @@
     if (last) render(last);
   }, 900);
 
+  // Overlay en jeu : on le fait glisser (ou on tire le coin) pendant le placement.
+  const PLACE_TIP = {
+    fr: k => `Glisse pour déplacer, tire le coin pour agrandir. ${k} pour valider.`,
+    en: k => `Drag to move, pull the corner to resize. ${k} to confirm.`,
+  };
+  if (INGAME) {
+    document.documentElement.classList.add('ingame');
+    addEventListener('mousedown', e => {
+      if (e.button !== 0 || !document.body.classList.contains('placing') || !window.ipc) return;
+      e.preventDefault();
+      window.ipc.postMessage(e.target.id === 'grip' ? 'resize' : 'drag');
+    });
+  }
+
   const HINTS = {
     fr: { setup: 'Overlay pas encore configuré : ouvre la page de réglages (/settings).', auth: 'Clique sur « Autoriser » dans la fenêtre Discord.' },
     en: { setup: 'Overlay not set up yet: open the settings page (/settings).', auth: 'Click "Authorize" in the Discord window.' },
@@ -220,10 +251,14 @@
     assetsV = snap.assetsVersion;
     const s = withOverrides((snap.profiles && snap.profiles[PROFILE]) || snap.profiles[snap.defaultProfile]);
     applyStyle(s);
-    const src = PREVIEW && !snap.channel ? fake : snap; // aperçu : vrai vocal si tu y es, sinon faux salon
+    const placing = INGAME && !!(snap.ingame && snap.ingame.placing);
+    document.body.classList.toggle('placing', placing);
+    // aperçu (et placement en jeu) : vrai vocal si tu y es, sinon faux salon
+    const src = (PREVIEW || placing) && !snap.channel ? fake : snap;
 
     const lang = langOf(snap);
-    const hint = PREVIEW ? '' : (snap.status === 'error' ? (snap.statusMsg || {})[lang] : HINTS[lang][snap.status]) || '';
+    if (placing) document.getElementById('placeTip').textContent = PLACE_TIP[lang](snap.ingame.hotkey.replace('Shift', lang === 'fr' ? 'Maj' : 'Shift'));
+    const hint = PREVIEW || INGAME ? '' : (snap.status === 'error' ? (snap.statusMsg || {})[lang] : HINTS[lang][snap.status]) || '';
     hintEl.hidden = !hint;
     hintEl.textContent = hint;
 

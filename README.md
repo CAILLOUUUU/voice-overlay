@@ -84,7 +84,7 @@ Ce que la version Rust ajoute dans la page de réglages :
 - **Mise à jour en un clic** : quand une nouvelle version sort, le bouton « Installer maintenant » la télécharge depuis la release GitHub, vérifie son empreinte SHA-256 (donnée par GitHub), remplace le `.exe` et relance l'appli. Si quelque chose ne va pas, l'ancienne version reste en place.
 - **Styles prêts à l'emploi**, avec un petit aperçu et un bouton pour annuler.
 - **Glisser-déposer** pour réordonner les personnes (souris ou doigt ; flèches du clavier aussi).
-- **Ajouter à OBS automatiquement**, grâce au serveur WebSocket intégré à OBS 28 et plus : la source « Navigateur » est créée (ou mise à jour) dans la scène choisie.
+- **Overlay en jeu** (onglet « En jeu ») : ton vocal par-dessus League, seulement pendant une partie, avec son propre style. La souris passe au travers, il ne prend jamais le focus du jeu et il est invisible dans OBS et les partages d'écran. Un raccourci (Ctrl+Maj+O par défaut) le fait apparaître pour le déplacer. League doit être en « Sans bordure » ou « Fenêtré ».
 - **Copier le diagnostic** : un rapport à envoyer en cas de souci (versions, états, détection League/DPM, fin du journal ; aucun mot de passe ni code Discord).
 
 #### Signer le `.exe` (supprime l'avertissement « Windows a protégé votre PC »)

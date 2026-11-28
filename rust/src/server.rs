@@ -297,7 +297,7 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
     if !post {
         return match path {
             "/api/state" => {
-                let (lang, profiles, forget) = app.read(|i| (i.lang.clone(), i.profiles.clone(), i.forget_after));
+                let (lang, profiles, forget, ingame) = app.read(|i| (i.lang.clone(), i.profiles.clone(), i.forget_after, i.ingame.clone()));
                 let (client_id, has, port) = {
                     let c = app.config.lock().unwrap();
                     (c.client_id.clone(), c.has_credentials(), c.port)
@@ -308,8 +308,9 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
                     "defaults": settings::defaults(), "clientId": client_id, "hasConfig": has, "port": port,
                     "canAutostart": platform::CAN_AUTOSTART, "autostart": autostart, "isExe": true,
                     "dataDir": app.paths.dir.display().to_string(),
+                    "ingame": { "enabled": ingame.enabled, "hotkey": ingame.hotkey, "settings": ingame.settings, "defaults": settings::ingame_defaults() },
                     // Ce que cette version sait faire (la page cache le reste).
-                    "features": ["diagnostics", "update-install"],
+                    "features": ["diagnostics", "update-install", "ingame"],
                 }))
             }
             "/api/diagnostics" => {
@@ -364,6 +365,11 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
         "/api/settings" => {
             let id = s(&b, "profile");
             let found = app.update(|i| {
+                if id == settings::INGAME {
+                    i.ingame.settings = clean_settings(b.get("settings"), &i.ingame.settings);
+                    i.broadcast();
+                    return true;
+                }
                 let Some(p) = i.profiles.iter_mut().find(|p| p.id == id) else { return false };
                 p.settings = clean_settings(b.get("settings"), &p.settings);
                 i.broadcast();
@@ -372,6 +378,37 @@ async fn api(app: &Arc<App>, path: &str, method: Method, req: Request) -> Respon
             if !found {
                 return err(404, m("Profil introuvable.", "Profile not found."));
             }
+            app.save_store();
+            ok()
+        }
+        // --- Overlay en jeu : activer, raccourci, placer, remettre à sa place de départ ---
+        "/api/ingame" => {
+            let hotkey = match b.get("hotkey").and_then(Value::as_str) {
+                Some(h) => match settings::clean_hotkey(h) {
+                    Some(h) => Some(h),
+                    None => return err(400, m("Raccourci non accepté : il faut Ctrl ou Alt avec une lettre ou un chiffre (ou une touche F1 à F12).", "Shortcut not accepted: use Ctrl or Alt with a letter or digit (or a key from F1 to F12).")),
+                },
+                None => None,
+            };
+            app.update(|i| {
+                if let Some(on) = b.get("enabled").and_then(Value::as_bool) {
+                    i.ingame.enabled = on;
+                    if !on {
+                        i.placing = false;
+                    }
+                }
+                if let Some(h) = hotkey {
+                    i.ingame.hotkey = h;
+                }
+                if let Some(p) = b.get("placing").and_then(Value::as_bool) {
+                    i.placing = p && i.ingame.enabled;
+                }
+                if b.get("resetPosition").and_then(Value::as_bool) == Some(true) {
+                    i.ingame.rect = None;
+                    i.placing = false;
+                }
+                i.broadcast();
+            });
             app.save_store();
             ok()
         }
