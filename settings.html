@@ -916,7 +916,7 @@
         if (i === 1) {
           if (p.effect === 'glow') card.style.boxShadow = `0 0 0 1px ${p.speakColor}, 0 0 8px ${hexA(p.speakColor, 60)}`;
           else if (p.effect === 'bounce') { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = `0 0 0 1px ${p.speakColor}`; }
-          else dot.style.boxShadow = `0 0 0 2px ${p.speakColor}`;
+          else card.style.boxShadow = `0 0 0 1px ${p.speakColor}`;
         }
         mini.append(card);
       });
