@@ -25,4 +25,4 @@ Content-Type: application/json
 ```
 
 L'appli accepte cet appel uniquement depuis une extension Chrome (`chrome-extension://…`) ou depuis ses propres pages.
-Aucune permission n'est nécessaire dans l'extension. Guide complet : [INTEGRATION-MARSO.md](INTEGRATION-MARSO.md).
+Pour le voyant « Pont DPM connecté », l'extension appelle aussi `GET http://127.0.0.1:47474/api/dpm/ping` environ une fois par minute.
