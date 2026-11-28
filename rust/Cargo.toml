@@ -1,0 +1,57 @@
+[package]
+name = "voice-overlay"
+version = "1.3.0"
+edition = "2021"
+description = "Voice Overlay - Caillou feat Claude : overlay OBS du salon vocal Discord"
+license-file = "../LICENSE"
+publish = false
+
+[[bin]]
+name = "voice-overlay"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "signal", "fs"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query", "json"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+uuid = { version = "1", features = ["v4"] }
+log = { version = "0.4", features = ["std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+include_dir = "0.7"
+unicode-normalization = "0.1"
+base64 = "0.22"
+open = "5"
+sys-locale = "0.3"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+png = "0.17"
+sha2 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+keyring = { version = "3", features = ["windows-native"] }
+
+# Fenêtre des réglages (WebView2 sous Windows, WKWebView sous macOS) et icône près de l'horloge
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+tray-icon = "0.27"
+tao = "0.38"
+wry = { version = "0.58", default-features = false, features = ["os-webview"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+# winresource est appelé seulement quand la cible est Windows (voir build.rs)
+[build-dependencies]
+winresource = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

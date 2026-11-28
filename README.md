@@ -65,6 +65,38 @@ node server.js --demo     # faux membres, sans Discord
 | `webfonts/` | Polices fournies (licence OFL) |
 | `build/` | Fabrication du `.exe` (`cd build && npm install && node build.js`) |
 
+### Version Rust (`rust/`)
+
+Le même programme, réécrit en Rust : un `.exe` d'environ 3 Mo au lieu d'embarquer Node.js, une vraie icône près de l'horloge (plus de script PowerShell), et le Client Secret et le jeton Discord rangés dans le Gestionnaire d'identifiants de Windows au lieu de `config.json` et `token.json` (déplacés automatiquement au premier lancement). Les pages `overlay.html` et `settings.html` sont les mêmes, embarquées dans le `.exe`, et les adresses (`/events`, `/api/...`) n'ont pas changé : l'extension Chrome marche telle quelle.
+
+```
+cd rust
+cargo run -- --demo --port=47474   # faux membres, sans Discord
+cargo test                         # tests (ressemblance des pseudos, liens DPM, Discord…)
+cargo build --release              # .exe dans rust/target/release (sous Windows)
+```
+
+Depuis macOS ou Linux : `rustup target add x86_64-pc-windows-msvc`, `cargo install cargo-xwin`, installer `mingw-w64` (pour l'icône), puis `cargo xwin build --release --target x86_64-pc-windows-msvc`. N'utilise pas la cible `-gnu` : le `.exe` aurait besoin de `WebView2Loader.dll` à côté de lui. Le workflow `.github/workflows/rust.yml` fabrique le `.exe` sous Windows et le joint à la release pour chaque tag `v*`.
+
+Ce que la version Rust ajoute dans la page de réglages :
+
+- **Une vraie fenêtre pour les réglages** au lieu d'un onglet du navigateur : même page, affichée par le moteur web de Windows (WebView2), avec l'icône de l'appli. La fermer libère sa mémoire, l'overlay continue de tourner ; l'icône près de l'horloge la rouvre. Les liens externes s'ouvrent dans ton navigateur, et la page reste accessible à `http://localhost:47474/settings`. Sans WebView2, les réglages s'ouvrent dans le navigateur comme avant.
+- **Mise à jour en un clic** : quand une nouvelle version sort, le bouton « Installer maintenant » la télécharge depuis la release GitHub, vérifie son empreinte SHA-256 (donnée par GitHub), remplace le `.exe` et relance l'appli. Si quelque chose ne va pas, l'ancienne version reste en place.
+- **Styles prêts à l'emploi**, avec un petit aperçu et un bouton pour annuler.
+- **Glisser-déposer** pour réordonner les personnes (souris ou doigt ; flèches du clavier aussi).
+- **Ajouter à OBS automatiquement**, grâce au serveur WebSocket intégré à OBS 28 et plus : la source « Navigateur » est créée (ou mise à jour) dans la scène choisie.
+- **Copier le diagnostic** : un rapport à envoyer en cas de souci (versions, états, détection League/DPM, fin du journal ; aucun mot de passe ni code Discord).
+
+#### Signer le `.exe` (supprime l'avertissement « Windows a protégé votre PC »)
+
+1. Demande une offre gratuite pour projet open source sur [signpath.org](https://signpath.org) (le dépôt doit être public).
+2. Dans SignPath, crée un projet `voice-overlay` lié à ce dépôt GitHub, avec une règle de signature `release-signing`.
+3. Sur GitHub, dans Settings → Secrets and variables → Actions : ajoute la variable `SIGNPATH_ORGANIZATION_ID` et le secret `SIGNPATH_API_TOKEN`.
+
+Ensuite, chaque tag `v*` publie un `.exe` signé. Tant que ce n'est pas configuré, le workflow publie le `.exe` sans signature, comme avant.
+
+Options utiles : `--port=N` (ou `VO_PORT`), `--silent`, `VO_DATA_DIR` (autre dossier de données), `VO_ASSETS_DIR=..` (lit les pages sur le disque, sans recompiler), `VO_NO_KEYRING=1` (secrets dans des fichiers), `VO_DEBUG=1` (journal détaillé). Dans `config.json`, `extensionIds` limite le pont DPM à certaines extensions. L'extension appelle le port 47474 : si tu le changes, modifie aussi `extension/background.js`.
+
 ## Crédits
 
 Fait par Caillou, construit avec Claude. Publié sous [licence MIT](LICENSE). Embarque Node.js et des polices libres : voir [LICENCES-TIERS.txt](LICENCES-TIERS.txt).

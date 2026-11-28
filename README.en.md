@@ -61,6 +61,38 @@ node server.js --demo     # fake members, no Discord needed
 | `webfonts/` | Included fonts (OFL license) |
 | `build/` | Builds the `.exe` (`cd build && npm install && node build.js`) |
 
+### Rust version (`rust/`)
+
+The same program, rewritten in Rust: a ~3 MB `.exe` instead of bundling Node.js, a real tray icon (no more PowerShell script), and the Client Secret and Discord token stored in Windows Credential Manager instead of `config.json` and `token.json` (moved automatically on first launch). `overlay.html` and `settings.html` are unchanged and embedded in the `.exe`, and the addresses (`/events`, `/api/...`) are the same, so the Chrome extension works as is.
+
+```
+cd rust
+cargo run -- --demo --port=47474   # fake members, no Discord needed
+cargo test                         # tests (name matching, DPM links, Discord protocol…)
+cargo build --release              # .exe in rust/target/release (on Windows)
+```
+
+From macOS or Linux: `rustup target add x86_64-pc-windows-msvc`, `cargo install cargo-xwin`, install `mingw-w64` (for the icon), then `cargo xwin build --release --target x86_64-pc-windows-msvc`. Don't use the `-gnu` target: the `.exe` would need `WebView2Loader.dll` next to it. The `.github/workflows/rust.yml` workflow builds the `.exe` on Windows and attaches it to the release for every `v*` tag.
+
+What the Rust version adds to the settings page:
+
+- **A real settings window** instead of a browser tab: same page, shown by Windows' built-in web engine (WebView2), with the app icon. Closing it frees its memory while the overlay keeps running; the tray icon reopens it. External links open in your browser, and the page is still available at `http://localhost:47474/settings`. Without WebView2, the settings open in the browser as before.
+- **One-click update**: when a new version is out, the "Install now" button downloads it from the GitHub release, checks its SHA-256 fingerprint (provided by GitHub), replaces the `.exe` and restarts the app. If anything goes wrong, the old version stays in place.
+- **Ready-made styles**, with a small preview and an undo button.
+- **Drag and drop** to reorder people (mouse or finger; arrow keys work too).
+- **Add to OBS automatically**, through the WebSocket server built into OBS 28 and later: the "Browser" source is created (or updated) in the chosen scene.
+- **Copy diagnostics**: a report to send when something goes wrong (versions, statuses, League/DPM detection, end of the log; no passwords or Discord codes).
+
+#### Signing the `.exe` (removes the "Windows protected your PC" warning)
+
+1. Apply for the free open-source plan at [signpath.org](https://signpath.org) (the repository must be public).
+2. In SignPath, create a `voice-overlay` project linked to this GitHub repository, with a `release-signing` signing policy.
+3. On GitHub, under Settings → Secrets and variables → Actions: add the `SIGNPATH_ORGANIZATION_ID` variable and the `SIGNPATH_API_TOKEN` secret.
+
+From then on, every `v*` tag publishes a signed `.exe`. Until this is set up, the workflow publishes the `.exe` unsigned, as before.
+
+Useful options: `--port=N` (or `VO_PORT`), `--silent`, `VO_DATA_DIR` (other data folder), `VO_ASSETS_DIR=..` (reads the pages from disk, no rebuild), `VO_NO_KEYRING=1` (secrets in files), `VO_DEBUG=1` (detailed log). In `config.json`, `extensionIds` restricts the DPM bridge to specific extensions. The extension calls port 47474: if you change it, edit `extension/background.js` too.
+
 ## Credits
 
 Made by Caillou, built with Claude. Released under the [MIT License](LICENSE). Bundles Node.js and open fonts: see [LICENCES-TIERS.txt](LICENCES-TIERS.txt).

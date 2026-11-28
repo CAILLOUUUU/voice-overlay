@@ -243,6 +243,7 @@
       let el = els.get(m.id);
       if (!el) {
         el = tpl.content.firstElementChild.cloneNode(true);
+        el.dataset.id = m.id;
         els.set(m.id, el);
       }
       const img = el.querySelector('.av');
@@ -263,7 +264,15 @@
     for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
   }
 
-  new EventSource('/events').onmessage = e => render(JSON.parse(e.data));
+  const es = new EventSource('/events');
+  es.onmessage = e => render(JSON.parse(e.data));
+  // Petit message envoyé à chaque prise de parole : on ne met à jour que « qui parle ».
+  es.addEventListener('speaking', e => {
+    if (!last) return;
+    const on = new Set(JSON.parse(e.data).speaking);
+    for (const m of last.members) m.speaking = on.has(m.id);
+    render(last);
+  });
 </script>
 </body>
 </html>

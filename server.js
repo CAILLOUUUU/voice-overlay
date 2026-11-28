@@ -80,6 +80,14 @@ function readJson(p) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
 }
 
+// Écriture sûre : on écrit à côté puis on remplace d'un coup.
+// Un plantage pendant l'écriture ne peut donc plus laisser un fichier à moitié écrit.
+function writeFileAtomic(p, data) {
+  const tmp = `${p}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, p);
+}
+
 function openBrowser(url) {
   if (WIN) exec(`start "" "${url}"`, { windowsHide: true });
 }
@@ -125,8 +133,19 @@ function fontsCss() {
 }
 
 // ---------- Config (identifiants Discord) ----------
-const config = { port: 47474, redirectUri: 'http://localhost', clientId: '', clientSecret: '' };
+// extensionIds : si la liste n'est pas vide, seules ces extensions Chrome peuvent envoyer un lobby DPM.
+const config = { port: 47474, redirectUri: 'http://localhost', clientId: '', clientSecret: '', extensionIds: [] };
 Object.assign(config, readJson(CONFIG_PATH) || {});
+{
+  // Port : --port=1234 ou VO_PORT=1234 l'emportent sur config.json.
+  const arg = process.argv.find(a => a.startsWith('--port='));
+  const p = Number(arg ? arg.slice(7) : process.env.VO_PORT || config.port);
+  config.port = Number.isInteger(p) && p > 0 && p < 65536 ? p : 47474;
+  if (!Array.isArray(config.extensionIds)) config.extensionIds = [];
+}
+// Journal de diagnostic League : seulement si on le demande (VO_DEBUG=1).
+const DEBUG = !!process.env.VO_DEBUG;
+if (!DEBUG) { try { fs.unlinkSync(path.join(DIR, 'league-debug.json')); } catch {} }
 if (/^COLLE_/.test(config.clientId)) config.clientId = '';
 if (/^COLLE_/.test(config.clientSecret)) config.clientSecret = '';
 const hasConfig = () => !!(config.clientId && config.clientSecret);
@@ -199,7 +218,7 @@ function saveStore() {
       links: Object.fromEntries(dpm.links),
     };
   }
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(store, null, 2));
+  writeFileAtomic(SETTINGS_PATH, JSON.stringify(store, null, 2));
 }
 let peopleSaveTimer = null;
 function savePeopleSoon() {
@@ -435,22 +454,35 @@ $timer.Start()
 // ---------- Serveur HTTP + flux temps réel (SSE) ----------
 const clients = new Set();
 
+// Plusieurs changements dans le même tour ne donnent qu'un seul envoi.
+let broadcastPending = false;
 function broadcast() {
-  const msg = `data: ${JSON.stringify(snapshot())}\n\n`;
+  if (broadcastPending) return;
+  broadcastPending = true;
+  setImmediate(() => {
+    broadcastPending = false;
+    const msg = `data: ${JSON.stringify(snapshot())}\n\n`;
+    for (const res of clients) res.write(msg);
+  });
+}
+// Qui parle : envoyé très souvent, donc un tout petit message au lieu de tout l'état.
+function broadcastSpeaking() {
+  if (broadcastPending) return; // l'état complet part déjà
+  const msg = `event: speaking\ndata: ${JSON.stringify({ speaking: [...state.speaking] })}\n\n`;
   for (const res of clients) res.write(msg);
 }
 
+const hostOk = req => [`localhost:${config.port}`, `127.0.0.1:${config.port}`].includes(req.headers.host);
 // Seules les pages servies par ce serveur ont le droit de modifier les réglages.
 function isLocalRequest(req) {
-  const ok = [`localhost:${config.port}`, `127.0.0.1:${config.port}`];
-  if (!ok.includes(req.headers.host)) return false;
+  if (!hostOk(req)) return false;
   const o = req.headers.origin;
-  return !o || ok.some(h => o === `http://${h}`);
+  return !o || o === `http://localhost:${config.port}` || o === `http://127.0.0.1:${config.port}`;
 }
 // L'extension Chrome (pont DPM) n'a le droit d'appeler que /api/dpm.
 function isExtensionRequest(req) {
-  const ok = [`localhost:${config.port}`, `127.0.0.1:${config.port}`];
-  return ok.includes(req.headers.host) && /^chrome-extension:\/\/[a-p]{32}$/.test(req.headers.origin || '');
+  const m = /^chrome-extension:\/\/([a-p]{32})$/.exec(req.headers.origin || '');
+  return hostOk(req) && !!m && (!config.extensionIds.length || config.extensionIds.includes(m[1]));
 }
 
 function readRaw(req, max) {
@@ -578,7 +610,7 @@ async function handleApi(url, req, res) {
       if (secret.length < 10) return sendJson(res, 400, { error: M('Le Client Secret a l\'air incomplet.', 'The Client Secret looks incomplete.') });
       config.clientId = id;
       config.clientSecret = secret;
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+      writeFileAtomic(CONFIG_PATH, JSON.stringify(config, null, 2));
       try { fs.unlinkSync(TOKEN_PATH); } catch {}
       restartRequested = true;
       if (rpc && rpc.sock) rpc.sock.destroy();
@@ -657,6 +689,8 @@ async function handleApi(url, req, res) {
 
 http.createServer((req, res) => {
   const url = req.url.split('?')[0];
+  // Protection contre le « DNS rebinding » : un site web ne doit pas pouvoir lire l'overlay.
+  if (!hostOk(req)) { res.writeHead(403); return res.end(); }
 
   if (url === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
@@ -809,11 +843,21 @@ class DiscordRPC {
     while (this.buf.length >= 8) {
       const op = this.buf.readInt32LE(0);
       const len = this.buf.readInt32LE(4);
+      if (len < 0 || len > 16e6) return this._broken('taille de message invalide');
       if (this.buf.length < 8 + len) break;
-      const msg = JSON.parse(this.buf.subarray(8, 8 + len).toString('utf8'));
+      const body = this.buf.subarray(8, 8 + len);
       this.buf = this.buf.subarray(8 + len);
-      this._handle(op, msg);
+      let msg;
+      try { msg = JSON.parse(body.toString('utf8')); } catch { console.error('[RPC] message illisible ignoré'); continue; }
+      try { this._handle(op, msg); } catch (e) { console.error('[RPC] erreur :', e.message); }
     }
+  }
+
+  // Flux corrompu : on coupe, la boucle principale se reconnecte.
+  _broken(why) {
+    console.error('[RPC] flux Discord corrompu :', why);
+    this.buf = Buffer.alloc(0);
+    this.sock.destroy();
   }
 
   _handle(op, msg) {
@@ -841,7 +885,7 @@ class DiscordRPC {
     if (this.closeReason) {
       err = new Error(this.closeReason);
       err.msg = /client.?id/i.test(this.closeReason)
-        ? M('Discord ne reconnaît pas ce Client ID. Vérifie que tu l\'as bien copié.', 'Discord does not recognize this Client ID. Check that you copied it correctly.')
+        ? M('Discord ne reconnaît pas cet identifiant d\'application. Vérifie que tu l\'as bien copié.', 'Discord does not recognize this Client ID. Check that you copied it correctly.')
         : M(`Discord a refusé la connexion : ${this.closeReason}`, `Discord refused the connection: ${this.closeReason}`);
       err.code = 'BLOCKED';
     }
@@ -851,13 +895,21 @@ class DiscordRPC {
     this._resolveClosed();
   }
 
-  request(cmd, args = {}, evt) {
+  // timeoutMs : AUTHORIZE attend que tu cliques dans Discord, il a donc droit à plus de temps.
+  request(cmd, args = {}, evt, timeoutMs = 10000) {
     return new Promise((resolve, reject) => {
       const nonce = crypto.randomUUID();
-      this.pending.set(nonce, { resolve, reject });
+      const timer = setTimeout(() => {
+        this.pending.delete(nonce);
+        reject(new Error(`${cmd} : pas de réponse de Discord`));
+      }, timeoutMs);
+      this.pending.set(nonce, {
+        resolve: v => { clearTimeout(timer); resolve(v); },
+        reject: e => { clearTimeout(timer); reject(e); },
+      });
       const payload = { cmd, args, nonce };
       if (evt) payload.evt = evt;
-      this._send(OP.FRAME, payload);
+      try { this._send(OP.FRAME, payload); } catch (e) { this.pending.get(nonce).reject(e); this.pending.delete(nonce); }
     });
   }
 }
@@ -874,13 +926,13 @@ async function exchangeToken(params) {
   if (!r.ok) {
     const e = new Error(`token: ${j.error || r.status}`);
     e.msg = j.error === 'invalid_client'
-      ? M('Le Client Secret n\'est pas le bon. Refais « Reset Secret » sur le site Discord et colle le nouveau.', 'The Client Secret is wrong. Click "Reset Secret" on the Discord site again and paste the new one.')
-      : M(`Discord a refusé les codes (${j.error || r.status}). Vérifie le Client ID, le Client Secret et l'adresse http://localhost dans « Redirects ».`,
+      ? M('La clé secrète n\'est pas la bonne. Refais « Réinitialiser la clé secrète » sur le site Discord et colle la nouvelle.', 'The Client Secret is wrong. Click "Reset Secret" on the Discord site again and paste the new one.')
+      : M(`Discord a refusé les codes (${j.error || r.status}). Vérifie l'identifiant, la clé secrète et l'adresse http://localhost dans « Redirections ».`,
           `Discord rejected the codes (${j.error || r.status}). Check the Client ID, the Client Secret and the http://localhost address under "Redirects".`);
     e.code = 'BLOCKED';
     throw e;
   }
-  fs.writeFileSync(TOKEN_PATH, JSON.stringify(j, null, 2));
+  writeFileAtomic(TOKEN_PATH, JSON.stringify(j, null, 2));
   return j;
 }
 
@@ -898,7 +950,7 @@ async function authenticate(rpc) {
   setStatus('auth', M('Une fenêtre s\'est ouverte dans Discord : clique sur "Autoriser".', 'A window opened in Discord: click "Authorize".'));
   let code;
   try {
-    ({ code } = await rpc.request('AUTHORIZE', { client_id: config.clientId, scopes: ['rpc', 'identify'] }));
+    ({ code } = await rpc.request('AUTHORIZE', { client_id: config.clientId, scopes: ['rpc', 'identify'] }, undefined, 5 * 60000));
   } catch (err) {
     const e = new Error(err.message);
     e.msg = M(`L'autorisation Discord a été refusée ou fermée. Clique sur « Réessayer », puis sur « Autoriser » dans Discord. (${err.message})`,
@@ -930,8 +982,22 @@ const POS = {
 };
 const toRole = v => POS[String(v || '').toLowerCase().replace(/[^a-z]/g, '')] || '';
 
+// Dossier trouvé à partir du client League lancé (marche même s'il est installé ailleurs).
+let leagueProcDir = null, leagueProcCheckedAt = 0;
+function findLeagueFromProcess() {
+  if (!WIN || Date.now() - leagueProcCheckedAt < 30000) return;
+  leagueProcCheckedAt = Date.now();
+  execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    "(Get-CimInstance Win32_Process -Filter \"Name='LeagueClientUx.exe'\" | Select-Object -First 1).ExecutablePath"],
+  { windowsHide: true, timeout: 8000 }, (err, out) => {
+    const exe = String(out || '').trim();
+    if (!err && exe) leagueProcDir = path.dirname(exe);
+  });
+}
+
 function leagueDirs() {
   const dirs = [];
+  if (leagueProcDir) dirs.push(leagueProcDir);
   try {
     const yaml = fs.readFileSync('C:\\ProgramData\\Riot Games\\Metadata\\league_of_legends.live\\league_of_legends.live.product_settings.yaml', 'utf8');
     const m = /product_install_full_path:\s*"?([^"\r\n]+)"?/.exec(yaml);
@@ -948,6 +1014,7 @@ function readLockfile() {
       if (port && password) return { port: Number(port), password, protocol: protocol || 'https' };
     } catch {}
   }
+  findLeagueFromProcess();
   return null;
 }
 
@@ -999,12 +1066,11 @@ async function readLeague() {
       localGet(lock.port, '/lol-lobby/v2/lobby', lock.password),
       localGet(lock.port, '/lol-champ-select/v1/session', lock.password),
     ]);
-    league.status = lobby || session ? 'on' : 'off';
-    // Ton propre Riot ID : te relie directement à ton compte Discord.
-    if (!league.self && league.status === 'on') {
-      const me = await localGet(lock.port, '/lol-summoner/v1/current-summoner', lock.password);
-      if (me && me.gameName) league.self = { name: me.gameName, tag: me.tagLine || '' };
-    }
+    // Hors salon, /lol-lobby répond 404 : on demande donc aussi ton compte, qui répond dès que le client est ouvert.
+    // Ton propre Riot ID te relie aussi directement à ton compte Discord.
+    const me = await localGet(lock.port, '/lol-summoner/v1/current-summoner', lock.password);
+    league.status = lobby || session || me ? 'on' : 'off';
+    if (!league.self && me && me.gameName) league.self = { name: me.gameName, tag: me.tagLine || '' };
     if (league.self && state.selfId && !dpm.links.has(state.selfId) && !dpm.blocked.has(blockKey(state.selfId, riotKey(league.self.name, league.self.tag)))) {
       dpm.links.set(state.selfId, { ...league.self });
       console.log(`Lien (client League) : toi ↔ ${league.self.name}#${league.self.tag}`);
@@ -1024,7 +1090,7 @@ async function readLeague() {
   }
   // Journal de diagnostic : ce que le client a vraiment renvoyé (aucune donnée de connexion dedans).
   const dump = JSON.stringify({ at: new Date().toISOString(), players, raw }, null, 1).slice(0, 400000);
-  if (Object.keys(raw).length && dump.replace(/"at":[^,]+,/, '') !== league.lastDump.replace(/"at":[^,]+,/, '')) {
+  if (DEBUG && Object.keys(raw).length && dump.replace(/"at":[^,]+,/, '') !== league.lastDump.replace(/"at":[^,]+,/, '')) {
     league.lastDump = dump;
     try { fs.writeFileSync(path.join(DIR, 'league-debug.json'), dump); } catch {}
   }
@@ -1107,7 +1173,8 @@ async function leagueTick() {
   if (players.length) league.roles = roles;
   if ((players.length && changed) || statusChanged) broadcast();
 }
-if ((WIN || process.env.VO_LEAGUE) && !DEMO) setInterval(leagueTick, 3000);
+// Une lecture à la fois : la suivante part 3 s après la fin de la précédente (jamais de chevauchement).
+if ((WIN || process.env.VO_LEAGUE) && !DEMO) (async () => { for (;;) { try { await leagueTick(); } catch {} await new Promise(r => setTimeout(r, 3000)); } })();
 
 // ---------- Pont DPM (inhouse.dpm.lol) ----------
 // L'extension Chrome « Voice Overlay – pont DPM » envoie le lobby tel que ta page DPM le reçoit :
@@ -1337,11 +1404,11 @@ function onEvent(evt, data) {
     case 'SPEAKING_START':
       if (data.channel_id && data.channel_id !== currentChannel) return;
       state.speaking.add(data.user_id);
-      broadcast();
+      broadcastSpeaking();
       break;
     case 'SPEAKING_STOP':
       state.speaking.delete(data.user_id);
-      broadcast();
+      broadcastSpeaking();
       break;
   }
 }
@@ -1407,7 +1474,7 @@ function runDemo() {
     for (const id of state.members.keys()) {
       if (Math.random() < 0.25) state.speaking.has(id) ? state.speaking.delete(id) : state.speaking.add(id);
     }
-    broadcast();
+    broadcastSpeaking();
   }, 500);
   setInterval(() => {
     const keys = [...state.members.keys()];
