@@ -80,7 +80,7 @@ What the Rust version adds to the settings page:
 - **One-click update**: when a new version is out, the "Install now" button downloads it from the GitHub release, checks its SHA-256 fingerprint (provided by GitHub), replaces the `.exe` and restarts the app. If anything goes wrong, the old version stays in place.
 - **Ready-made styles**, with a small preview and an undo button.
 - **Drag and drop** to reorder people (mouse or finger; arrow keys work too).
-- **Add to OBS automatically**, through the WebSocket server built into OBS 28 and later: the "Browser" source is created (or updated) in the chosen scene.
+- **In-game overlay** ("In game" tab): your voice channel on top of League, only during a game, with its own style. The mouse goes through it, it never takes focus from the game and it is invisible in OBS and screen shares. A shortcut (Ctrl+Shift+O by default) brings it up so you can move it. League must be in "Borderless" or "Windowed" mode.
 - **Copy diagnostics**: a report to send when something goes wrong (versions, statuses, League/DPM detection, end of the log; no passwords or Discord codes).
 
 #### Signing the `.exe` (removes the "Windows protected your PC" warning)

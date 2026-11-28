@@ -82,6 +82,10 @@ pub struct Dpm {
     /// arrivées dans le vocal pendant ce lobby : (id Discord, instant)
     pub joins: Vec<(String, i64)>,
     pub last_extension: i64,
+    /// dernier signal « je suis là » de l'extension (toutes les minutes, même sans page DPM ouverte)
+    pub last_ping: i64,
+    /// état « extension connectée » déjà envoyé aux pages
+    pub ext_shown: bool,
     /// liens oubliés à la main : « idDiscord|riotKey », pas recréés avant le prochain lobby
     pub blocked: HashSet<String>,
 }
@@ -108,6 +112,11 @@ pub struct Inner {
     pub assets_version: i64,
     pub league: League,
     pub dpm: Dpm,
+    pub ingame: settings::Ingame,
+    /// L'overlay en jeu est affiché pour être déplacé (raccourci ou bouton des réglages).
+    pub placing: bool,
+    /// Le raccourci a pu être réservé auprès de Windows (sinon un autre programme l'utilise).
+    pub hotkey_ok: bool,
     // Drapeaux remis à zéro par App::update
     dirty: bool,
     speaking_dirty: bool,
@@ -136,6 +145,9 @@ impl Inner {
             assets_version: now_ms(),
             league: League { status: "off", ..Default::default() },
             dpm: Dpm { links: loaded.links, ..Default::default() },
+            ingame: loaded.ingame,
+            placing: false,
+            hotkey_ok: true,
             dirty: false,
             speaking_dirty: false,
             people_dirty: false,
@@ -179,7 +191,7 @@ impl Inner {
         let base = settings::profile_id_base(name);
         let mut id = base.clone();
         let mut i = 2;
-        while self.profile(&id).is_some() {
+        while self.profile(&id).is_some() || id == settings::INGAME {
             id = format!("{base}-{i}");
             i += 1;
         }
@@ -263,7 +275,10 @@ impl Inner {
             "update": self.update,
             "updateStatus": self.update_status.as_ref().map(|(s, e)| json!({ "state": s, "error": e })),
             "lang": self.lang,
-            "profiles": self.profiles.iter().map(|p| (p.id.clone(), Value::Object(p.settings.clone()))).collect::<serde_json::Map<_, _>>(),
+            "profiles": self.profiles.iter().map(|p| (p.id.clone(), Value::Object(p.settings.clone())))
+                .chain(std::iter::once((settings::INGAME.to_string(), Value::Object(self.ingame.settings.clone()))))
+                .collect::<serde_json::Map<_, _>>(),
+            "ingame": { "enabled": self.ingame.enabled, "placing": self.placing, "hotkey": self.ingame.hotkey, "hotkeyOk": self.hotkey_ok },
             "defaultProfile": self.profiles[0].id,
             "assetsVersion": self.assets_version,
             "channel": self.channel,
@@ -324,7 +339,8 @@ impl Inner {
                 "order": self.order,
                 "lastSeen": self.last_seen,
                 "links": self.dpm.links,
-            }
+            },
+            "ingame": self.ingame,
         })
     }
 }
@@ -440,7 +456,10 @@ impl App {
             self.update(|i| {
                 let n = i.custom.len() + i.order.len();
                 i.prune_people();
-                if i.custom.len() + i.order.len() != n {
+                // L'extension s'est tue depuis un moment : le voyant passe au gris.
+                let ext = i.dpm_extension_connected();
+                if i.custom.len() + i.order.len() != n || ext != i.dpm.ext_shown {
+                    i.dpm.ext_shown = ext;
                     i.broadcast();
                 }
             });

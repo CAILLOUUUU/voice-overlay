@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Voice Overlay – pont DPM",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Envoie le lobby inhouse.dpm.lol à l'appli Voice Overlay (rôles, équipes, liens Discord ↔ Riot).",
+  "permissions": ["alarms"],
   "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
   "background": { "service_worker": "background.js" },
   "content_scripts": [

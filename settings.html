@@ -60,6 +60,8 @@
   button.ghost { background: var(--panel2); border: 1px solid var(--line2); color: var(--text); font-weight: 600; }
   button.ghost:hover { background: #2b303c; border-color: rgba(255, 255, 255, .24); }
   button:disabled { opacity: .35; cursor: default; }
+  .askbox { margin-top: 12px; padding: 12px 14px; border: 1px solid rgba(247, 102, 94, .35); border-radius: 10px; background: rgba(247, 102, 94, .06); }
+  .askbox p { margin: 0 0 10px; line-height: 1.5; }
   button.danger:hover, button.confirm { border-color: var(--bad) !important; color: var(--bad) !important; background: rgba(247, 102, 94, .08) !important; }
   .err { color: var(--bad); min-height: 1.2em; margin: 6px 0 0; }
   .ok-msg { color: var(--ok) !important; }
@@ -98,6 +100,11 @@
 
   /* ---------- Personnes : un classement DPM qu'on peut modifier ---------- */
   #leagueInfo { margin-bottom: 10px; font-size: 12.5px; }
+  .dpmrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+  .dpmdot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dpmdot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  #dpmHelp { font-weight: 500; font-size: 12.5px; }
+  .rolesnote { margin-top: 8px; font-size: 12.5px; }
   #leagueInfo:empty { display: none; }
   .empty { color: var(--dim); margin: 4px 0; padding: 22px; border: 1px dashed var(--line2); border-radius: 8px; text-align: center; }
   #people { display: flex; flex-direction: column; margin: 0 -18px; }
@@ -184,6 +191,9 @@
   .tabs button.add { border: 1px dashed var(--line2); }
   #previewBox { position: sticky; top: 0; align-self: start; }
   .profbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 0 10px; }
+  .ighead { margin: 22px 0 8px; }
+  #igKey { min-width: 130px; font-variant-numeric: tabular-nums; }
+  #igKey.listening, #igPlace.listening { border-color: var(--accent2); color: var(--accent2); }
   .profbar .lbl { color: var(--dim); font-size: 13px; font-weight: 600; }
   #stage { position: relative; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; height: min(660px, calc(100vh - 190px)); min-height: 360px; background: #3a4654; display: grid; place-items: center; }
   #stage.bg-dark { background: #0d0f10; }
@@ -309,7 +319,7 @@
     </div>
     <div class="wz-step" id="wzS3" hidden>
       <div class="wz-state"><div id="wzDoneIcon"></div><h3 id="wzDoneTitle"></h3><p data-t="w4Text"></p></div>
-      <div class="wz-actions"><button class="primary" id="wzObs" data-t="w4Obs"></button><button class="ghost" id="wzFinish" data-t="w4Later"></button></div>
+      <div class="wz-actions"><button class="primary" id="wzFinish" data-t="w4Later"></button></div>
       <p class="tip" style="text-align:center;margin-top:14px" data-t="w4Manual"></p>
       <div class="copybox"><code id="wzUrl"></code><button data-copy="" data-t="copy"></button></div>
     </div>
@@ -325,15 +335,18 @@
       <button role="tab" id="tab-people" aria-controls="pane-people" data-pane="people"><span data-t="tabPeople"></span><span class="count" id="peopleCount" hidden></span></button>
       <button role="tab" id="tab-style" aria-controls="pane-style" data-pane="style" data-t="tabStyle"></button>
       <button role="tab" id="tab-obs" aria-controls="pane-obs" data-pane="obs" data-t="tabObs"></button>
+      <button role="tab" id="tab-ingame" aria-controls="pane-ingame" data-pane="ingame" data-t="tabIngame"></button>
       <button role="tab" id="tab-app" aria-controls="pane-app" data-pane="app" data-t="tabApp"></button>
     </nav>
 
     <div class="pane" id="pane-people" role="tabpanel" aria-labelledby="tab-people">
       <section>
+        <div class="dpmrow"><span class="dpmdot" id="dpmDot"></span><span id="dpmText"></span><a id="dpmHelp" href="https://github.com/CAILLOUUUU/voice-overlay/tree/main/extension" target="_blank" rel="noopener" data-t="dpmHelp" hidden></a></div>
         <p class="muted" id="leagueInfo"></p>
         <p class="empty" id="peopleEmpty" data-t="peopleEmpty"></p>
         <div id="people"></div>
         <p class="muted" id="peopleFoot" hidden data-t="peopleHelp"></p>
+        <p class="muted rolesnote" id="rolesNote" hidden data-t="rolesNote"></p>
       </section>
       <details class="more">
         <summary data-t="peopleMore"></summary>
@@ -345,10 +358,15 @@
           </select></div>
         <div class="btnrow"><button class="ghost danger" id="peopleReset" data-t="peopleReset"></button>
           <button class="ghost" id="linksReset"></button></div>
+        <div class="askbox" id="linksAsk" hidden>
+          <p id="linksWhy"></p>
+          <div class="btnrow"><button class="ghost danger" id="linksYes" data-t="linksYes"></button><button class="ghost" id="linksNo" data-t="linksNo"></button></div>
+        </div>
       </details>
     </div>
 
     <div class="pane" id="pane-style" role="tabpanel" aria-labelledby="tab-style" hidden>
+     <div id="styleBox">
       <section>
         <h2 data-t="presetTitle"></h2>
         <p class="muted lead" data-t="presetHelp"></p>
@@ -367,6 +385,7 @@
         <p class="err" id="importMsg"></p>
       </details>
       <div class="row endrow"><span><span data-t="resetLabel"></span><small data-t="resetHelp"></small></span><button class="ghost danger" id="resetBtn" data-t="resetBtn"></button></div>
+     </div>
     </div>
 
     <div class="pane" id="pane-obs" role="tabpanel" aria-labelledby="tab-obs" hidden>
@@ -376,25 +395,26 @@
         <p class="muted hint" data-t="obsHelp"></p>
       </section>
       <section>
-        <h2 data-t="obsAutoLabel"></h2>
-        <p class="muted lead" data-t="obsAutoHelp"></p>
-        <div id="obsBox">
-          <label class="sub" for="obsPass" data-t="obsPass"></label>
-          <div class="url"><input type="password" id="obsPass" autocomplete="off" data-tp="obsPassPh"><button id="obsConnect" data-t="obsConnect"></button></div>
-          <div id="obsScenes" hidden>
-            <label class="sub" for="obsScene" data-t="obsScene"></label>
-            <div class="url"><select id="obsScene"></select><button id="obsAdd" data-t="obsAdd"></button></div>
-          </div>
-          <p class="err" id="obsMsg"></p>
-        </div>
-      </section>
-      <section>
-        <h2 data-t="profTitle"></h2>
-        <p class="muted lead" data-t="profHelp"></p>
         <label class="sub" for="profName" data-t="profName"></label>
         <input type="text" id="profName" maxlength="40" autocomplete="off">
         <div class="row endrow" id="profDelRow"><span></span><button class="ghost" id="profDel" data-t="profDel"></button></div>
       </section>
+    </div>
+
+    <div class="pane" id="pane-ingame" role="tabpanel" aria-labelledby="tab-ingame" hidden>
+      <section>
+        <h2 data-t="igTitle"></h2>
+        <p class="muted lead" data-t="igHelp"></p>
+        <div class="row"><span><label for="igOn" data-t="igOn"></label><small data-t="igOnHelp"></small></span><input type="checkbox" id="igOn"></div>
+        <div id="igMore">
+          <div class="row"><span><span data-t="igKey"></span><small data-t="igKeyHelp"></small></span><button class="ghost" id="igKey"></button></div>
+          <p class="err" id="igKeyMsg"></p>
+          <div class="row"><span><span data-t="igPlace"></span><small data-t="igPlaceHelp"></small></span><button class="ghost" id="igPlace"></button></div>
+          <div class="row"><span><span data-t="igReset"></span><small data-t="igResetHelp"></small></span><button class="ghost" id="igReset" data-t="igResetBtn"></button></div>
+        </div>
+      </section>
+      <h2 class="ighead" data-t="igStyle"></h2>
+      <div id="igStyleHost"></div>
     </div>
 
     <div class="pane" id="pane-app" role="tabpanel" aria-labelledby="tab-app" hidden>
@@ -439,7 +459,16 @@
     fr: {
       talking: 'Parle', muted: 'Micro coupé', deafened: 'Sourd', hideOn: 'Masquer de l\'overlay', hideOff: 'Afficher dans l\'overlay',
       sourceLbl: 'Source OBS · 400 × 600', previewClick: 'Clique sur quelqu\'un dans l\'aperçu pour le retrouver dans la liste.',
-      tabPeople: 'Personnes', tabStyle: 'Style', tabObs: 'Profil et OBS', tabApp: 'Application',
+      tabPeople: 'Personnes', tabStyle: 'Style', tabObs: 'Profil et OBS', tabIngame: 'En jeu', tabApp: 'Application',
+      igTitle: 'Overlay en jeu',
+      igHelp: 'Affiche ton vocal par-dessus League, seulement pendant une partie. Il n\'apparaît ni dans OBS ni dans tes partages d\'écran. Dans League, mets l\'affichage en « Sans bordure » ou « Fenêtré » (en « Plein écran », le jeu passe par-dessus).',
+      igOn: 'Activer l\'overlay en jeu', igOnHelp: 'La souris passe au travers : il ne gêne pas tes clics.',
+      igKey: 'Raccourci pour le déplacer', igKeyHelp: 'Appuie dessus, même en jeu : un cadre apparaît, glisse l\'overlay où tu veux, puis rappuie pour valider.',
+      igKeyWait: 'Appuie sur ta combinaison…', igKeyBusy: 'Ce raccourci est déjà pris par un autre programme : choisis-en un autre.',
+      igKeyBad: 'Il faut Ctrl ou Alt avec une lettre ou un chiffre (ou une touche F1 à F12).',
+      igPlace: 'Placer l\'overlay maintenant', igPlaceHelp: 'Pour le mettre en place sans lancer de partie.', igPlaceBtn: 'Placer', igPlaceDone: 'Valider la position',
+      igReset: 'Remettre à sa place de départ', igResetHelp: 'En haut à gauche de l\'écran, taille d\'origine.', igResetBtn: 'Remettre',
+      igStyle: 'Style de l\'overlay en jeu', igLabel: 'Overlay en jeu', igSource: 'Overlay en jeu · aperçu',
       profileLabel: 'Profil :', peopleMore: 'Options et remise à zéro',
       resetBtn: 'Réinitialiser', resetLabel: 'Revenir au style de départ', resetHelp: 'Remet tous les réglages de ce profil par défaut.', resetConfirm: 'Clique encore pour réinitialiser',
       credLabel: 'Connexion à Discord', credHelp: 'Change le Client ID ou le Client Secret, ou refais l\'assistant.', credBtn: 'Identifiants Discord',
@@ -480,15 +509,14 @@
       errTips: { id: 'Vérifie l\'identifiant d\'application (étape 1).', secret: 'Refais « Réinitialiser la clé secrète » et colle la nouvelle (étape 2).', redirect: 'Vérifie que http://localhost est dans Redirections et que tu as cliqué sur « Enregistrer les modifications » (étape 2).' },
       w4Done: u => `C'est prêt, ${u} !`,
       w4Text: 'Rejoins un salon vocal : toi et les autres apparaîtrez dans l\'aperçu, puis dans OBS.',
-      w4Obs: 'Ajouter à OBS automatiquement', w4Later: 'Plus tard',
-      w4Manual: 'Ou à la main dans OBS : Source → Navigateur, avec cette adresse :',
+      w4Later: 'Terminer',
+      w4Manual: 'Dans OBS : Source → Navigateur, avec cette adresse :',
       status: {
         starting: 'Démarrage…', setup: 'Identifiants Discord à saisir', 'no-discord': 'Discord introuvable : ouvre l\'appli Discord sur ce PC',
         auth: 'Clique sur « Autoriser » dans la fenêtre Discord', demo: 'Mode démo (faux membres)', closed: 'L\'application est fermée : relance-la',
         connected: (u, ch, n) => `Connecté en tant que ${u}` + (ch ? ` · dans « ${ch} » (${n})` : ' · dans aucun vocal'),
       },
       obsTitle: 'Lien OBS de ce profil', obsHelp: 'Source → Navigateur, 400 × 600 pour commencer. Les réglages s\'appliquent en direct.',
-      profTitle: 'Profils d\'overlay', profHelp: 'Chaque profil a son style et son lien OBS : un par scène, ils marchent tous en même temps. Choisis le profil à modifier au-dessus de l\'aperçu.',
       profName: 'Nom du profil', profNew: '＋ Nouveau profil', profDel: 'Supprimer ce profil', profDelConfirm: 'Clique encore pour supprimer',
       newProfile: n => `Profil ${n}`,
       peopleTitle: 'Personnes', peopleEmpty: 'Rejoins un salon vocal : les personnes présentes apparaîtront ici.',
@@ -499,7 +527,11 @@
       leagueOff: 'Client League fermé : choisis les rôles à la main, ou ouvre League pour les détecter.',
       dpmLobby: (v, n, l) => `Lobby DPM reçu : ${v}/${n} dans le vocal, ${l} relié(s) à Discord.`,
       dpmWaiting: 'Pont DPM actif : en attente d\'un lobby.',
+      dpmOn: 'Pont DPM connecté', dpmOff: 'Pont DPM non détecté', dpmHelp: 'Installer l\'extension ↗',
+      rolesNote: 'La détection automatique des rôles (DPM et League) n\'est pas parfaite : si un rôle est mal attribué, choisis le bon dans le menu de la personne. Un rôle choisi à la main passe toujours avant la détection.',
       linksReset: n => `Oublier les liens Discord ↔ League (${n})`, unlink: 'oublier',
+      linksWhy: n => `Pendant tes lobbies inhouse.dpm.lol, l'appli apprend quel compte Discord correspond à quel Riot ID (${n} lien${n > 1 ? 's' : ''} pour l'instant). C'est ce qui lui permet de mettre le bon rôle à chacun dès la game suivante. Si tu les oublies, elle devra tout réapprendre au prochain lobby. Tes renommages, ton ordre et les rôles choisis à la main ne changent pas.`,
+      linksYes: 'Oui, tout oublier', linksNo: 'Annuler',
       leagueOn: 'Client League détecté : les rôles se remplissent seuls quand le pseudo League ressemble au pseudo Discord.',
       leagueGame: 'Partie League en cours : rôles lus depuis le jeu.',
       peopleReset: 'Tout remettre à zéro', hide: 'Masquer', up: 'Monter', down: 'Descendre', shownName: 'Nom affiché',
@@ -518,7 +550,7 @@
       showNames: 'Afficher les pseudos', showIcons: 'Icônes micro coupé / sourd', showDecorations: 'Décorations d\'avatar Discord', showRoles: 'Rôles League of Legends',
       hideSelf: 'Me cacher de la liste', speakingOnly: 'Seulement ceux qui parlent', dimSilent: 'Estomper ceux qui ne parlent pas',
       effect: 'Effet quand quelqu\'un parle', ring: 'Contour', glow: 'Halo lumineux', bounce: 'Rebond',
-      speakColor: 'Couleur « parle »', accentColor: 'Couleur d\'accent (point du titre)', textColor: 'Couleur du texte', bgColor: 'Couleur de fond',
+      speakColor: 'Couleur « parle »', accentColor: 'Couleur du rôle', textColor: 'Couleur du texte', bgColor: 'Couleur de fond',
       bgOpacity: 'Opacité du fond', font: 'Police', bold: 'Pseudos en gras', animate: 'Animation d\'arrivée',
       customCss: 'CSS personnalisé', cssHelp: 'Classes utiles : #title, .m, .m.speaking, .av, .name',
       fontMine: 'Tes polices', fontBuiltin: 'Polices fournies', fontSystem: 'Polices Windows',
@@ -527,22 +559,23 @@
       updError: e => `La mise à jour a échoué : ${e || 'erreur inconnue'}. Utilise le lien de téléchargement.`,
       drag: 'Glisser pour changer l\'ordre (ou flèches haut/bas du clavier)', dragLocked: 'Rangé automatiquement selon son rôle',
       presetTitle: 'Styles prêts à l\'emploi', presetHelp: 'S\'applique au profil sélectionné. Ton titre, tes options d\'affichage et ton CSS ne bougent pas.',
-      presetUndo: '↶ Annuler le style', presetNames: { classic: 'Discord', neon: 'Néon', minimal: 'Minimal', esport: 'Esport rouge', light: 'Clair', comic: 'BD', bar: 'Barre horizontale', hextech: 'Hextech' },
+      presetUndo: '↶ Annuler le style', presetNames: { classic: 'Discord', minimal: 'Minimal', esport: 'Esport rouge', light: 'Clair', hextech: 'Hextech' },
       diagLabel: 'Diagnostic', diagHelp: 'Copie un rapport à envoyer si quelque chose ne marche pas. Il contient les noms des personnes du vocal, mais aucun mot de passe ni code Discord.',
       diagBtn: 'Copier le diagnostic', diagCopied: 'Copié ✓ Colle-le dans ton message (Ctrl+V).', diagShown: 'Sélectionne le texte ci-dessous et copie-le (Ctrl+C).',
-      obsAutoLabel: 'Ajouter à OBS automatiquement', obsOpen: 'Ajouter à OBS…',
-      obsAutoHelp: 'Dans OBS : Outils → Paramètres du serveur WebSocket → coche « Activer le serveur WebSocket ». Si « Activer l\'authentification » est coché, clique sur « Afficher les informations de connexion » et copie le mot de passe.',
-      obsPass: 'Mot de passe du serveur WebSocket d\'OBS', obsPassPh: 'Vide si l\'authentification est désactivée', obsConnect: 'Connecter',
-      obsScene: 'Ajouter la source dans la scène', obsAdd: 'Ajouter', obsWorking: 'Connexion à OBS…',
-      obsNoObs: 'OBS ne répond pas. Ouvre OBS et active le serveur WebSocket (voir ci-dessus).',
-      obsNeedPass: 'OBS demande un mot de passe : colle celui du serveur WebSocket.', obsBadPass: 'Mot de passe refusé par OBS.',
-      obsAdded: sc => `Ajouté dans la scène « ${sc} » ✓ (400 × 600, à placer où tu veux).`, obsUpdated: sc => `La source existait déjà : son lien est à jour et elle est dans « ${sc} » ✓`,
-      obsFail: e => `OBS a refusé : ${e}`,
     },
     en: {
       talking: 'Talking', muted: 'Muted', deafened: 'Deafened', hideOn: 'Hide from the overlay', hideOff: 'Show in the overlay',
       sourceLbl: 'OBS source · 400 × 600', previewClick: 'Click someone in the preview to find them in the list.',
-      tabPeople: 'People', tabStyle: 'Style', tabObs: 'Profile & OBS', tabApp: 'App',
+      tabPeople: 'People', tabStyle: 'Style', tabObs: 'Profile & OBS', tabIngame: 'In game', tabApp: 'App',
+      igTitle: 'In-game overlay',
+      igHelp: 'Shows your voice channel on top of League, only during a game. It doesn\'t show in OBS or in your screen shares. In League, set the display to "Borderless" or "Windowed" (in "Full screen" the game covers it).',
+      igOn: 'Turn on the in-game overlay', igOnHelp: 'The mouse goes through it: it never blocks your clicks.',
+      igKey: 'Shortcut to move it', igKeyHelp: 'Press it, even in game: a frame shows up, drag the overlay where you want, then press it again to confirm.',
+      igKeyWait: 'Press your combination…', igKeyBusy: 'Another program already uses this shortcut: pick another one.',
+      igKeyBad: 'Use Ctrl or Alt with a letter or digit (or a key from F1 to F12).',
+      igPlace: 'Place the overlay now', igPlaceHelp: 'To set it up without starting a game.', igPlaceBtn: 'Place', igPlaceDone: 'Confirm position',
+      igReset: 'Back to the starting spot', igResetHelp: 'Top left of the screen, original size.', igResetBtn: 'Reset',
+      igStyle: 'In-game overlay style', igLabel: 'In-game overlay', igSource: 'In-game overlay · preview',
       profileLabel: 'Profile:', peopleMore: 'Options and reset',
       resetBtn: 'Reset', resetLabel: 'Back to the default style', resetHelp: 'Resets every setting of this profile.', resetConfirm: 'Click again to reset',
       credLabel: 'Discord connection', credHelp: 'Change the Client ID or Client Secret, or redo the setup.', credBtn: 'Discord credentials',
@@ -583,15 +616,14 @@
       errTips: { id: 'Check the Application ID (step 1).', secret: 'Click "Reset Secret" again and paste the new one (step 2).', redirect: 'Check that http://localhost is under Redirects and that you clicked Save Changes (step 2).' },
       w4Done: u => `All set, ${u}!`,
       w4Text: 'Join a voice channel: you and the others will show up in the preview, then in OBS.',
-      w4Obs: 'Add to OBS automatically', w4Later: 'Later',
-      w4Manual: 'Or by hand in OBS: Source → Browser, with this address:',
+      w4Later: 'Done',
+      w4Manual: 'In OBS: Source → Browser, with this address:',
       status: {
         starting: 'Starting…', setup: 'Discord credentials needed', 'no-discord': 'Discord not found: open the Discord app on this PC',
         auth: 'Click "Authorize" in the Discord window', demo: 'Demo mode (fake members)', closed: 'The app is closed: start it again',
         connected: (u, ch, n) => `Connected as ${u}` + (ch ? ` · in "${ch}" (${n})` : ' · not in a voice channel'),
       },
       obsTitle: 'OBS link for this profile', obsHelp: 'Source → Browser, 400 × 600 to start. Settings apply live.',
-      profTitle: 'Overlay profiles', profHelp: 'Each profile has its own style and OBS link: one per scene, they all work at the same time. Pick the profile to edit above the preview.',
       profName: 'Profile name', profNew: '＋ New profile', profDel: 'Delete this profile', profDelConfirm: 'Click again to delete',
       newProfile: n => `Profile ${n}`,
       peopleTitle: 'People', peopleEmpty: 'Join a voice channel: the people in it will show up here.',
@@ -602,7 +634,11 @@
       leagueOff: 'League client closed: pick roles by hand, or open League to detect them.',
       dpmLobby: (v, n, l) => `DPM lobby received: ${v}/${n} in voice, ${l} linked to Discord.`,
       dpmWaiting: 'DPM bridge active: waiting for a lobby.',
+      dpmOn: 'DPM bridge connected', dpmOff: 'DPM bridge not detected', dpmHelp: 'Install the extension ↗',
+      rolesNote: 'Automatic role detection (DPM and League) isn\'t perfect: if a role is wrong, pick the right one in the person\'s menu. A role picked by hand always wins over detection.',
       linksReset: n => `Forget Discord ↔ League links (${n})`, unlink: 'forget',
+      linksWhy: n => `During your inhouse.dpm.lol lobbies, the app learns which Discord account matches which Riot ID (${n} link${n > 1 ? 's' : ''} so far). That's how it gives everyone the right role from the next game on. If you forget them, it will have to learn them again at the next lobby. Your renames, your order and the roles you picked by hand don't change.`,
+      linksYes: 'Yes, forget them all', linksNo: 'Cancel',
       leagueOn: 'League client detected: roles fill in by themselves when the League name looks like the Discord name.',
       leagueGame: 'League game in progress: roles read from the game.',
       peopleReset: 'Reset everything', hide: 'Hide', up: 'Move up', down: 'Move down', shownName: 'Displayed name',
@@ -621,7 +657,7 @@
       showNames: 'Show names', showIcons: 'Muted / deafened icons', showDecorations: 'Discord avatar decorations', showRoles: 'League of Legends roles',
       hideSelf: 'Hide me from the list', speakingOnly: 'Only people speaking', dimSilent: 'Dim people who aren\'t speaking',
       effect: 'Effect when someone speaks', ring: 'Outline', glow: 'Glow', bounce: 'Bounce',
-      speakColor: 'Speaking color', accentColor: 'Accent color (title dot)', textColor: 'Text color', bgColor: 'Background color',
+      speakColor: 'Speaking color', accentColor: 'Role color', textColor: 'Text color', bgColor: 'Background color',
       bgOpacity: 'Background opacity', font: 'Font', bold: 'Bold names', animate: 'Entrance animation',
       customCss: 'Custom CSS', cssHelp: 'Useful classes: #title, .m, .m.speaking, .av, .name',
       fontMine: 'Your fonts', fontBuiltin: 'Included fonts', fontSystem: 'Windows fonts',
@@ -630,17 +666,9 @@
       updError: e => `The update failed: ${e || 'unknown error'}. Use the download link.`,
       drag: 'Drag to reorder (or use the up/down arrow keys)', dragLocked: 'Sorted automatically by role',
       presetTitle: 'Ready-made styles', presetHelp: 'Applies to the selected profile. Your title, display options and CSS stay as they are.',
-      presetUndo: '↶ Undo style', presetNames: { classic: 'Discord', neon: 'Neon', minimal: 'Minimal', esport: 'Esport red', light: 'Light', comic: 'Comic', bar: 'Horizontal bar', hextech: 'Hextech' },
+      presetUndo: '↶ Undo style', presetNames: { classic: 'Discord', minimal: 'Minimal', esport: 'Esport red', light: 'Light', hextech: 'Hextech' },
       diagLabel: 'Diagnostics', diagHelp: 'Copies a report to send if something doesn\'t work. It includes the names of people in your voice channel, but no passwords or Discord codes.',
       diagBtn: 'Copy diagnostics', diagCopied: 'Copied ✓ Paste it in your message (Ctrl+V).', diagShown: 'Select the text below and copy it (Ctrl+C).',
-      obsAutoLabel: 'Add to OBS automatically', obsOpen: 'Add to OBS…',
-      obsAutoHelp: 'In OBS: Tools → WebSocket Server Settings → tick "Enable WebSocket server". If "Enable Authentication" is ticked, click "Show Connect Info" and copy the password.',
-      obsPass: 'OBS WebSocket server password', obsPassPh: 'Empty if authentication is off', obsConnect: 'Connect',
-      obsScene: 'Add the source to scene', obsAdd: 'Add', obsWorking: 'Connecting to OBS…',
-      obsNoObs: 'OBS doesn\'t answer. Open OBS and turn on its WebSocket server (see above).',
-      obsNeedPass: 'OBS asks for a password: paste the WebSocket server password.', obsBadPass: 'OBS rejected the password.',
-      obsAdded: sc => `Added to scene "${sc}" ✓ (400 × 600, move it where you like).`, obsUpdated: sc => `The source already existed: its link is updated and it's in "${sc}" ✓`,
-      obsFail: e => `OBS refused: ${e}`,
     },
   };
   let lang = 'fr', S = L.fr;
@@ -686,13 +714,17 @@
   // ---------- Réglages ----------
   const SYSTEM_FONTS = ['Segoe UI', 'Arial', 'Verdana', 'Trebuchet MS', 'Georgia', 'Impact', 'Consolas', 'Comic Sans MS', 'Bahnschrift'];
   let settings = {}, defaults = {}, saveTimer, saveFlush = null;
-  let profiles = [], cur = null, port = 47474;
+  let profiles = [], cur = null, port = 47474, linksCount = 0;
   let files = { builtinFonts: [], fonts: [] };
   const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   const loadFiles = async () => (files = await (await fetch('/api/files')).json());
   const upload = async (kind, file) => (await fetch(`/api/upload?kind=${kind}&name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })).json();
 
-  const curP = () => profiles.find(p => p.id === cur);
+  const INGAME = 'ingame';
+  let ingame = { enabled: false, hotkey: 'Ctrl+Shift+O', settings: {}, defaults: {} }, igPrev = null, igOk = true, igPlacing = false;
+  const ingameP = { id: INGAME, name: '', get settings() { return ingame.settings; }, set settings(v) { ingame.settings = v; } };
+  const curP = () => cur === INGAME ? ingameP : profiles.find(p => p.id === cur);
+  const curDefaults = () => cur === INGAME ? ingame.defaults : defaults;
   const profileUrl = id => `http://localhost:${port}/?profile=${encodeURIComponent(id)}`;
 
   // ---------- Profils d'overlay ----------
@@ -710,6 +742,7 @@
   }
   function selectProfile(id) {
     if (saveFlush) saveFlush();
+    if (cur === INGAME && $('styleBox').parentElement !== $('pane-style')) $('pane-style').append($('styleBox'));
     cur = profiles.some(p => p.id === id) ? id : profiles[0].id;
     try { localStorage.setItem('voProfile', cur); } catch {}
     settings = curP().settings;
@@ -859,12 +892,9 @@
   // Seulement l'apparence : le titre, qui afficher et le CSS personnalisé restent ceux de l'utilisateur.
   const PRESETS = {
     classic: { layout: 'column', size: 40, gap: 6, shape: 'circle', effect: 'ring', speakColor: '#23a55a', accentColor: '#5865f2', textColor: '#ffffff', bgColor: '#1e1f22', bgOpacity: 90, font: 'Inter', bold: true },
-    neon: { layout: 'column', size: 42, gap: 8, shape: 'rounded', effect: 'glow', speakColor: '#00e5ff', accentColor: '#ff2bd6', textColor: '#f5f7ff', bgColor: '#0b0a1a', bgOpacity: 80, font: 'Orbitron', bold: true },
     minimal: { layout: 'column', size: 36, gap: 4, shape: 'circle', effect: 'ring', speakColor: '#ffffff', accentColor: '#ffffff', textColor: '#ffffff', bgColor: '#000000', bgOpacity: 0, font: 'Poppins', bold: false },
     esport: { layout: 'column', size: 40, gap: 6, shape: 'square', effect: 'glow', speakColor: '#ff4655', accentColor: '#ff4655', textColor: '#ffffff', bgColor: '#140608', bgOpacity: 88, font: 'Rajdhani', bold: true },
     light: { layout: 'column', size: 40, gap: 6, shape: 'rounded', effect: 'ring', speakColor: '#23a55a', accentColor: '#8b6cff', textColor: '#1b1c20', bgColor: '#ffffff', bgOpacity: 95, font: 'Rubik', bold: true },
-    comic: { layout: 'column', size: 44, gap: 8, shape: 'circle', effect: 'bounce', speakColor: '#ffd60a', accentColor: '#ff7a00', textColor: '#ffffff', bgColor: '#241a3a', bgOpacity: 90, font: 'Bangers', bold: true },
-    bar: { layout: 'row', size: 52, gap: 8, shape: 'rounded', effect: 'glow', speakColor: '#8b6cff', accentColor: '#8b6cff', textColor: '#ffffff', bgColor: '#121318', bgOpacity: 86, font: 'Barlow Condensed', bold: true },
     hextech: { layout: 'column', size: 40, gap: 6, shape: 'circle', effect: 'ring', speakColor: '#c8aa6e', accentColor: '#0ac8b9', textColor: '#f0e6d2', bgColor: '#010a13', bgOpacity: 90, font: 'Montserrat', bold: true },
   };
   let presetUndo = null;
@@ -886,7 +916,7 @@
         if (i === 1) {
           if (p.effect === 'glow') card.style.boxShadow = `0 0 0 1px ${p.speakColor}, 0 0 8px ${hexA(p.speakColor, 60)}`;
           else if (p.effect === 'bounce') { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = `0 0 0 1px ${p.speakColor}`; }
-          else dot.style.boxShadow = `0 0 0 2px ${p.speakColor}`;
+          else card.style.boxShadow = `0 0 0 1px ${p.speakColor}`;
         }
         mini.append(card);
       });
@@ -908,99 +938,6 @@
     presetUndo = null;
     buildForm();
     save();
-  }
-
-  // ---------- OBS (serveur WebSocket intégré à OBS 28 et plus, protocole v5) ----------
-  async function sha256b64(text) {
-    const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return btoa(String.fromCharCode(...new Uint8Array(h)));
-  }
-  function obsConnect(password, url = 'ws://127.0.0.1:4455') {
-    return new Promise((resolve, reject) => {
-      let ws;
-      try { ws = new WebSocket(url); } catch { return reject('noObs'); }
-      const pending = new Map();
-      let n = 0, done = false;
-      const finish = (ok, v) => { if (done) return; done = true; clearTimeout(timer); ok ? resolve(v) : (ws.close(), reject(v)); };
-      const timer = setTimeout(() => finish(false, 'noObs'), 6000);
-      const api = {
-        call: (requestType, requestData = {}) => new Promise((res, rej) => {
-          const requestId = 'vo' + (++n);
-          pending.set(requestId, { res, rej });
-          ws.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData } }));
-        }),
-        close: () => ws.close(),
-      };
-      ws.onmessage = async e => {
-        let m;
-        try { m = JSON.parse(e.data); } catch { return; }
-        if (m.op === 0) {
-          const d = { rpcVersion: 1 };
-          const a = m.d && m.d.authentication;
-          if (a) {
-            if (!password) return finish(false, 'needPass');
-            d.authentication = await sha256b64(await sha256b64(password + a.salt) + a.challenge);
-          }
-          ws.send(JSON.stringify({ op: 1, d }));
-        } else if (m.op === 2) {
-          finish(true, api);
-        } else if (m.op === 7) {
-          const p = pending.get(m.d.requestId);
-          if (!p) return;
-          pending.delete(m.d.requestId);
-          if (m.d.requestStatus && m.d.requestStatus.result) p.res(m.d.responseData || {});
-          else p.rej(m.d.requestStatus || {});
-        }
-      };
-      ws.onclose = e => {
-        for (const p of pending.values()) p.rej({ comment: 'closed' });
-        pending.clear();
-        finish(false, e.code === 4009 ? 'badPass' : 'noObs');
-      };
-    });
-  }
-  let obs = null;
-  const obsSay = (text, ok) => { $('obsMsg').textContent = text; $('obsMsg').className = ok ? 'ok-msg' : 'err'; };
-  async function obsStart() {
-    if (obs) { obs.close(); obs = null; }
-    $('obsScenes').hidden = true;
-    obsSay(S.obsWorking, true);
-    const pw = $('obsPass').value;
-    try {
-      obs = await obsConnect(pw);
-    } catch (e) {
-      return obsSay(S[{ needPass: 'obsNeedPass', badPass: 'obsBadPass' }[e] || 'obsNoObs']);
-    }
-    try { if (pw) localStorage.setItem('voObsPass', pw); else localStorage.removeItem('voObsPass'); } catch {}
-    try {
-      const { scenes = [], currentProgramSceneName } = await obs.call('GetSceneList');
-      const sel = $('obsScene');
-      sel.textContent = '';
-      for (const sc of [...scenes].sort((a, b) => (b.sceneIndex || 0) - (a.sceneIndex || 0))) sel.append(el('option', { value: sc.sceneName, textContent: sc.sceneName }));
-      if (currentProgramSceneName) sel.value = currentProgramSceneName;
-      $('obsScenes').hidden = false;
-      obsSay('');
-    } catch (e) { obsSay(S.obsFail(e.comment || e.code || '?')); }
-  }
-  async function obsAdd() {
-    if (!obs) return obsStart();
-    const sceneName = $('obsScene').value;
-    const inputName = `Voice Overlay · ${curP().name}`;
-    const url = profileUrl(cur);
-    try {
-      const { inputs = [] } = await obs.call('GetInputList', { inputKind: 'browser_source' });
-      if (inputs.some(i => i.inputName === inputName)) {
-        await obs.call('SetInputSettings', { inputName, inputSettings: { url } });
-        try { await obs.call('GetSceneItemId', { sceneName, sourceName: inputName }); }
-        catch { await obs.call('CreateSceneItem', { sceneName, sourceName: inputName }); }
-        obsSay(S.obsUpdated(sceneName), true);
-      } else {
-        await obs.call('CreateInput', { sceneName, inputName, inputKind: 'browser_source', inputSettings: { url, width: 400, height: 600 }, sceneItemEnabled: true });
-        obsSay(S.obsAdded(sceneName), true);
-      }
-    } catch (e) {
-      obsSay(S.obsFail(e.comment || e.code || '?'));
-    }
   }
 
   // ---------- Aperçu : la source OBS à sa vraie taille ----------
@@ -1032,10 +969,80 @@
     new ResizeObserver(fitSource).observe($('stage'));
   }
 
+  // ---------- Overlay en jeu ----------
+  const keyLabel = k => lang === 'fr' ? k.replace('Shift', 'Maj') : k;
+  let igListening = false;
+  function drawIngame() {
+    $('igOn').checked = ingame.enabled;
+    $('igMore').hidden = !ingame.enabled;
+    if (!igListening) $('igKey').textContent = keyLabel(ingame.hotkey);
+    $('igPlace').textContent = igPlacing ? S.igPlaceDone : S.igPlaceBtn;
+    $('igPlace').classList.toggle('listening', igPlacing);
+    if (!igListening && !$('igKeyMsg').dataset.own) $('igKeyMsg').textContent = igOk ? '' : S.igKeyBusy;
+  }
+  function showIngame(snap) {
+    if (!snap.ingame) return;
+    ingame.enabled = snap.ingame.enabled;
+    ingame.hotkey = snap.ingame.hotkey;
+    igOk = snap.ingame.hotkeyOk !== false;
+    igPlacing = !!snap.ingame.placing;
+    drawIngame();
+  }
+  function listenKey() {
+    if (igListening) return;
+    igListening = true;
+    $('igKey').textContent = S.igKeyWait;
+    $('igKey').classList.add('listening');
+    delete $('igKeyMsg').dataset.own;
+    $('igKeyMsg').textContent = '';
+    const stop = () => { igListening = false; $('igKey').classList.remove('listening'); removeEventListener('keydown', onKey, true); drawIngame(); };
+    const onKey = async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') return stop();
+      if (['Control', 'Alt', 'Shift', 'Meta', 'AltGraph'].includes(e.key)) return;
+      let k = null;
+      if (/^Key[A-Z]$/.test(e.code)) k = e.code.slice(3);
+      else if (/^(Digit|Numpad)[0-9]$/.test(e.code)) k = e.code.slice(-1);
+      else if (/^F([1-9]|1[0-2])$/.test(e.code)) k = e.code;
+      const combo = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', k].filter(Boolean).join('+');
+      stop();
+      const j = k ? await (await post('/api/ingame', { hotkey: combo })).json().catch(() => ({})) : { error: S.igKeyBad };
+      if (j.error) { $('igKeyMsg').dataset.own = '1'; $('igKeyMsg').textContent = msg(j.error); }
+      else { ingame.hotkey = combo; drawIngame(); }
+    };
+    addEventListener('keydown', onKey, true);
+  }
+  function bindIngame() {
+    $('igOn').onchange = () => { ingame.enabled = $('igOn').checked; drawIngame(); post('/api/ingame', { enabled: ingame.enabled }); };
+    $('igKey').onclick = listenKey;
+    $('igPlace').onclick = () => post('/api/ingame', { placing: !igPlacing });
+    $('igReset').onclick = () => post('/api/ingame', { resetPosition: true });
+    drawIngame();
+  }
+
   // ---------- Onglets ----------
-  const PANES = ['people', 'style', 'obs', 'app'];
+  const PANES = ['people', 'style', 'obs', 'ingame', 'app'];
   function showPane(name, focus) {
-    if (!PANES.includes(name)) name = 'people';
+    if (!PANES.includes(name) || $('tab-' + name).hidden) name = 'people';
+    // Onglet « En jeu » : l'éditeur de style y passe et modifie le style de l'overlay en jeu.
+    const box = $('styleBox');
+    if (name === 'ingame' && cur !== INGAME) {
+      igPrev = cur;
+      if (saveFlush) saveFlush();
+      cur = INGAME;
+      settings = ingame.settings;
+      $('igStyleHost').append(box);
+      document.querySelector('#stage iframe').src = `/?preview&profile=${INGAME}`;
+      $('profTabs').textContent = '';
+      $('profTabs').append(el('span', { className: 'lbl', textContent: S.igLabel }));
+      $('sourceLbl').textContent = S.igSource;
+      buildForm();
+    } else if (name !== 'ingame' && cur === INGAME) {
+      $('pane-style').append(box);
+      $('sourceLbl').textContent = S.sourceLbl;
+      selectProfile(igPrev);
+    }
     for (const n of PANES) {
       const on = n === name;
       $('pane-' + n).hidden = !on;
@@ -1166,14 +1173,20 @@
     const ls = (s.league || {}).status;
     const d = s.dpm || {};
     $('leagueInfo').textContent = d.lobby ? S.dpmLobby(d.lobby.inVoice, d.lobby.players, d.lobby.linked)
-      : (d.extension ? S.dpmWaiting + ' ' : '') + (ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff);
+      : (ls === 'game' ? S.leagueGame : ls === 'on' ? S.leagueOn : S.leagueOff);
+    $('dpmDot').classList.toggle('on', !!d.extension);
+    $('dpmText').textContent = d.extension ? S.dpmOn : S.dpmOff;
+    $('dpmHelp').hidden = !!d.extension;
     $('linksReset').textContent = S.linksReset(d.links || 0);
     $('linksReset').hidden = !d.links;
+    linksCount = d.links || 0;
+    if (!d.links) $('linksAsk').hidden = true;
     $('peopleEmpty').hidden = ms.length > 0;
     $('peopleCount').hidden = ms.length === 0;
     $('peopleCount').textContent = ms.length;
     $('peopleCount').classList.toggle('live', ms.some(m => m.speaking));
     $('peopleFoot').hidden = ms.length === 0;
+    $('rolesNote').hidden = ms.length === 0;
     const key = ms.map(m => m.id).join(',');
     peopleIds = ms.map(m => m.id);
     if (key !== peopleKey) {
@@ -1400,7 +1413,6 @@
     $('csecret').addEventListener('keydown', e => { if (e.key === 'Enter') $('wzNext').click(); });
     $('wzClose').onclick = wzClose;
     $('wzFinish').onclick = wzClose;
-    $('wzObs').onclick = () => { wzClose(); showPane('obs'); $('obsPass').focus(); };
     $('wzRetry').onclick = () => { wz.last = { ...(wz.last || {}), status: 'starting' }; wzState(); post('/api/retry'); };
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && wz.open) wzClose(); });
     $('credBtn').onclick = () => wzShow(0);
@@ -1416,7 +1428,9 @@
     bgs[0].classList.add('on');
 
     confirmTwice($('peopleReset'), () => S.peopleReset, () => S.resetConfirm, () => post('/api/people-reset'));
-    $('linksReset').onclick = () => post('/api/dpm-forget', {});
+    $('linksReset').onclick = () => { $('linksWhy').textContent = S.linksWhy(linksCount); $('linksAsk').hidden = false; $('linksNo').focus(); };
+    $('linksNo').onclick = () => { $('linksAsk').hidden = true; };
+    $('linksYes').onclick = () => { $('linksAsk').hidden = true; post('/api/dpm-forget', {}); };
     $('forgetSel').onchange = () => post('/api/people-forget', { minutes: Number($('forgetSel').value) });
     $('dataBtn').onclick = () => post('/api/open-data');
     $('quitBtn').onclick = async () => { await post('/api/quit'); $('quitBtn').textContent = S.stopped; };
@@ -1424,7 +1438,7 @@
       const j = await (await post('/api/autostart', { enabled: $('autostart').checked })).json();
       $('autostart').checked = !!j.autostart;
     };
-    confirmTwice($('resetBtn'), () => S.resetBtn, () => S.resetConfirm, () => { settings = curP().settings = { ...defaults }; buildForm(); save(); });
+    confirmTwice($('resetBtn'), () => S.resetBtn, () => S.resetConfirm, () => { settings = curP().settings = { ...curDefaults() }; buildForm(); save(); });
     $('presetUndo').onclick = undoPreset;
     $('updateInstall').onclick = async () => {
       $('updateInstall').hidden = true;
@@ -1433,9 +1447,6 @@
       if (j.error) $('updateState').textContent = S.updError(msg(j.error));
     };
     $('diagBtn').onclick = copyDiagnostics;
-    $('obsConnect').onclick = obsStart;
-    $('obsPass').onkeydown = e => { if (e.key === 'Enter') obsStart(); };
-    $('obsAdd').onclick = obsAdd;
 
     // Profils
     $('profDel').onclick = deleteProfile;
@@ -1471,7 +1482,7 @@
       $('importMsg').style.color = ok ? 'var(--ok)' : '';
       $('importMsg').textContent = ok ? S.importOk : S.importBad;
       if (!ok) return;
-      for (const k of Object.keys(defaults)) if (k in data.style && typeof data.style[k] === typeof defaults[k]) settings[k] = data.style[k];
+      for (const k of Object.keys(curDefaults())) if (k in data.style && typeof data.style[k] === typeof curDefaults()[k]) settings[k] = data.style[k];
       buildForm();
       save();
     };
@@ -1501,17 +1512,19 @@
     $('ver').textContent = `${S.version} ${s.version}`;
     bootVersion = s.version;
     $('diagRow').hidden = !(s.features || []).includes('diagnostics');
-    try { $('obsPass').value = localStorage.getItem('voObsPass') || ''; } catch {}
+    $('tab-ingame').hidden = !(s.features || []).includes('ingame');
+    if (s.ingame) ingame = { ...s.ingame };
     bind();
-    bindTabs();
+    bindIngame();
     bindPreview();
     let last = null;
     try { last = localStorage.getItem('voProfile'); } catch {}
     selectProfile(last);
+    bindTabs();
 
     const es = new EventSource('/events');
     let lastSnap = null;
-    es.onmessage = e => { const snap = lastSnap = JSON.parse(e.data); showStatus(snap); showPeople(snap); };
+    es.onmessage = e => { const snap = lastSnap = JSON.parse(e.data); showStatus(snap); showPeople(snap); showIngame(snap); };
     es.addEventListener('speaking', e => {
       if (!lastSnap) return;
       const on = new Set(JSON.parse(e.data).speaking);

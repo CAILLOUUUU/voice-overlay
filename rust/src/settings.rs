@@ -43,6 +43,95 @@ pub fn defaults() -> Map<String, Value> {
     }
 }
 
+/// Identifiant réservé : le style de l'overlay en jeu (ce n'est pas un profil OBS).
+pub const INGAME: &str = "ingame";
+/// Raccourci par défaut pour déplacer l'overlay en jeu.
+pub const DEFAULT_HOTKEY: &str = "Ctrl+Shift+O";
+
+/// Style de départ de l'overlay en jeu : plus petit et plus discret que celui d'OBS.
+pub fn ingame_defaults() -> Map<String, Value> {
+    let mut d = defaults();
+    for (k, v) in [("showTitle", json!(false)), ("size", json!(32)), ("gap", json!(4)), ("bgOpacity", json!(70)), ("showDecorations", json!(false))] {
+        d.insert(k.into(), v);
+    }
+    d
+}
+
+/// Overlay affiché par-dessus le jeu (seulement pendant une partie de League).
+#[derive(Clone, Debug, Serialize)]
+pub struct Ingame {
+    pub enabled: bool,
+    pub hotkey: String,
+    /// Position et taille en pixels de l'écran : [x, y, largeur, hauteur]
+    pub rect: Option<[i32; 4]>,
+    pub settings: Map<String, Value>,
+}
+
+impl Default for Ingame {
+    fn default() -> Self {
+        Ingame { enabled: false, hotkey: DEFAULT_HOTKEY.into(), rect: None, settings: ingame_defaults() }
+    }
+}
+
+/// Raccourci clavier propre (« Ctrl+Shift+O »), ou `None` s'il n'est pas utilisable.
+/// Il faut au moins Ctrl ou Alt (sinon on bloquerait une touche du jeu), sauf pour les touches F1 à F12.
+pub fn clean_hotkey(h: &str) -> Option<String> {
+    let mut ctrl = false;
+    let mut alt = false;
+    let mut shift = false;
+    let mut key: Option<String> = None;
+    for t in h.split('+').map(str::trim) {
+        match t.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => ctrl = true,
+            "alt" => alt = true,
+            "shift" | "maj" => shift = true,
+            k if key.is_none() => {
+                let up = k.to_ascii_uppercase();
+                let ok = (up.len() == 1 && up.bytes().all(|b| b.is_ascii_alphanumeric()))
+                    || up.strip_prefix('F').and_then(|n| n.parse::<u8>().ok()).is_some_and(|n| (1..=12).contains(&n));
+                if !ok {
+                    return None;
+                }
+                key = Some(up);
+            }
+            _ => return None,
+        }
+    }
+    let key = key?;
+    if !(ctrl || alt || key.len() > 1) {
+        return None;
+    }
+    let mut out: Vec<&str> = vec![];
+    if ctrl {
+        out.push("Ctrl");
+    }
+    if alt {
+        out.push("Alt");
+    }
+    if shift {
+        out.push("Shift");
+    }
+    out.push(&key);
+    Some(out.join("+"))
+}
+
+fn load_ingame(v: Option<&Value>) -> Ingame {
+    let mut g = Ingame::default();
+    let Some(v) = v.filter(|v| v.is_object()) else { return g };
+    g.enabled = v.get("enabled").is_some_and(js_truthy);
+    if let Some(h) = v.get("hotkey").and_then(Value::as_str).and_then(clean_hotkey) {
+        g.hotkey = h;
+    }
+    if let Some(Value::Array(a)) = v.get("rect") {
+        let n: Vec<i32> = a.iter().filter_map(Value::as_i64).map(|x| x.clamp(-100_000, 100_000) as i32).collect();
+        if n.len() == 4 && n[2] >= 80 && n[3] >= 60 {
+            g.rect = Some([n[0], n[1], n[2], n[3]]);
+        }
+    }
+    g.settings = clean_settings(v.get("settings"), &ingame_defaults());
+    g
+}
+
 /// Même conversion que `Number(v)` en JavaScript (sauf cas exotiques).
 fn js_number(v: &Value) -> Option<f64> {
     let n = match v {
@@ -162,6 +251,7 @@ pub struct Loaded {
     pub order: Vec<String>,
     pub last_seen: HashMap<String, i64>,
     pub links: HashMap<String, RiotLink>,
+    pub ingame: Ingame,
 }
 
 pub fn role_or_empty(v: Option<&Value>) -> String {
@@ -182,7 +272,7 @@ pub fn load(raw: Option<Value>) -> Loaded {
     if let Some(Value::Array(ps)) = raw.get("profiles") {
         for p in ps {
             let Some(id) = p.get("id").and_then(Value::as_str) else { continue };
-            if !valid_profile_id(id) || profiles.iter().any(|x| x.id == id) {
+            if !valid_profile_id(id) || id == INGAME || profiles.iter().any(|x| x.id == id) {
                 continue;
             }
             let name = clean_name(p.get("name").and_then(Value::as_str).unwrap_or(""));
@@ -242,7 +332,7 @@ pub fn load(raw: Option<Value>) -> Loaded {
             links.insert(id.clone(), RiotLink { name: truncate(name, 40), tag: truncate(&tag, 10) });
         }
     }
-    Loaded { lang, profiles, forget_after, custom, order, last_seen, links }
+    Loaded { lang, profiles, forget_after, custom, order, last_seen, links, ingame: load_ingame(raw.get("ingame")) }
 }
 
 #[cfg(test)]
@@ -258,6 +348,33 @@ mod tests {
         assert_eq!(s["font"], json!("12"));
         assert_eq!(s["gap"], json!(6), "valeur invalide : on garde la précédente");
         assert!(!s.contains_key("evil"));
+    }
+
+    #[test]
+    fn hotkeys() {
+        assert_eq!(clean_hotkey("ctrl+shift+o").as_deref(), Some("Ctrl+Shift+O"));
+        assert_eq!(clean_hotkey("Shift+Alt+3").as_deref(), Some("Alt+Shift+3"));
+        assert_eq!(clean_hotkey("F9").as_deref(), Some("F9"));
+        assert_eq!(clean_hotkey("Shift+F12").as_deref(), Some("Shift+F12"));
+        assert_eq!(clean_hotkey("O"), None, "une lettre seule gênerait le jeu");
+        assert_eq!(clean_hotkey("Shift+Q"), None);
+        assert_eq!(clean_hotkey("Ctrl+Tab"), None);
+        assert_eq!(clean_hotkey("Ctrl+A+B"), None);
+        assert_eq!(clean_hotkey("Ctrl+F13"), None);
+    }
+
+    #[test]
+    fn ingame_load() {
+        let l = load(Some(json!({ "ingame": { "enabled": true, "hotkey": "alt+p", "rect": [10, 20, 300, 400], "settings": { "size": 50 } } })));
+        assert!(l.ingame.enabled);
+        assert_eq!(l.ingame.hotkey, "Alt+P");
+        assert_eq!(l.ingame.rect, Some([10, 20, 300, 400]));
+        assert_eq!(l.ingame.settings["size"], json!(50));
+        assert_eq!(l.ingame.settings["showTitle"], json!(false));
+        let d = load(Some(json!({ "ingame": { "hotkey": "x", "rect": [1, 2, 3] } })));
+        assert!(!d.ingame.enabled);
+        assert_eq!(d.ingame.hotkey, DEFAULT_HOTKEY);
+        assert_eq!(d.ingame.rect, None);
     }
 
     #[test]

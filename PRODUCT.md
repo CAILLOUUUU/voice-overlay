@@ -26,7 +26,7 @@ It follows *your* voice channel automatically (no channel to pick), and it knows
 
 ## Capabilities and Constraints
 
-- Settings capabilities to keep: Discord setup assistant (4 steps), several overlay profiles each with its own OBS link, live preview with background choices, ready-made styles, every style option (title, layout, size, gap, shape, names, icons, decorations, roles, hide self, speaking only, dim silent, effect, colors, opacity, font incl. imported fonts, bold, animation, custom CSS), style export/import, people list (rename, reorder by drag, hide, manual role, League/DPM links), forget delay and resets, add to OBS via obs-websocket, autostart, data folder, diagnostics, quit, one-click update, French and English.
+- Settings capabilities to keep: Discord setup assistant (4 steps), several overlay profiles each with its own OBS link, live preview with background choices, ready-made styles, every style option (title, layout, size, gap, shape, names, icons, decorations, roles, hide self, speaking only, dim silent, effect, colors, opacity, font incl. imported fonts, bold, animation, custom CSS), style export/import, people list (rename, reorder by drag, hide, manual role, League/DPM links), forget delay and resets, in-game overlay (own style, League games only, click-through, excluded from capture, hotkey to move), autostart, data folder, diagnostics, quit, one-click update, French and English.
 - `settings.html` is one self-contained file (no build step, no framework), served unchanged by both the Node version and the Rust app, and embedded in the `.exe`. Fonts are self-hosted under `webfonts/` (OFL).
 - The overlay page's look is user-configured and separate from the settings app's look.
 
